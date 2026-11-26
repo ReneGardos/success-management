@@ -41,8 +41,8 @@ export default async function LeadPage({ params, searchParams }: { params: Promi
       {sp.gemt && <p className="admin-notice is-ok" role="status">Gemt.</p>}
       {sp.fejl && <p className="admin-notice is-error" role="alert">{sp.fejl}</p>}
 
-      <div className="crm-grid-3">
-        <form action={saveLead} className="admin-form crm-span-2">
+      <div className="crm-pairs">
+        <form action={saveLead} className="admin-form">
           <input type="hidden" name="id" value={lead.id} />
           <h2>Oplysninger</h2>
           <div className="admin-form-grid">

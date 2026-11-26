@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { BarChart3, Building2, CalendarDays, Clock, Contact, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { BarChart3, Building2, CalendarDays, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -11,6 +11,8 @@ const groups = [
     { href: "/admin/vagtplan", label: "Vagtplan", icon: CalendarDays },
     { href: "/admin/timer", label: "Timer", icon: Clock },
     { href: "/admin/steder", label: "Steder", icon: MapPin },
+    { href: "/admin/rapporter", label: "Rapporter", icon: ClipboardCheck },
+    { href: "/admin/forsyning", label: "Forsyning", icon: PackageOpen },
   ] },
   { title: "Kunder og salg", links: [
     { href: "/admin/mail", label: "Indbakke", icon: Mail },
@@ -18,6 +20,8 @@ const groups = [
     { href: "/admin/kunder", label: "Kunder", icon: Contact },
     { href: "/admin/tilbud", label: "Tilbud", icon: FileSignature },
     { href: "/admin/fakturaer", label: "Fakturaer", icon: Receipt },
+    { href: "/admin/prisliste", label: "Prisliste", icon: ListChecks },
+    { href: "/admin/feedback", label: "Kundefeedback", icon: MessageCircleWarning },
   ] },
   { title: "Team og system", links: [
     { href: "/admin/statistik", label: "Statistik", icon: BarChart3 },

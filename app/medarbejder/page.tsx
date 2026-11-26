@@ -35,9 +35,9 @@ function ShiftInfo({ shift }: { shift: Shift }) {
   )
 }
 
-export default async function EmployeePage({ searchParams }: { searchParams: Promise<{ vis?: string }> }) {
+export default async function EmployeePage({ searchParams }: { searchParams: Promise<{ vis?: string; rapport?: string; mangler?: string }> }) {
   const { user, fullName, org, ctx } = await requireRolePage(["employee", "admin"], "/medarbejder")
-  const { vis = "vagter" } = await searchParams
+  const { vis = "vagter", rapport, mangler } = await searchParams
   const db = createAdminClient()
   const today = todayLocal()
   const now = copenhagenToIso(today, "00:00")!
@@ -77,9 +77,14 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
           </div>
         </div>
 
+        {rapport && <p className="rounded-lg border border-primary bg-background p-3 text-sm" role="status">Tak! Rapporten er sendt.</p>}
+        {mangler && <p className="rounded-lg border border-primary bg-background p-3 text-sm" role="status">Beskeden er sendt til kontoret.</p>}
+        <Link href="/medarbejder/mangler" className="rounded-xl border-2 border-dashed border-border bg-background px-4 py-4 text-center text-base font-semibold">Mangler du noget? Giv kontoret besked</Link>
+
         {openEntry && (
           <section className="flex flex-col gap-3 rounded-xl border-2 border-primary bg-background p-5" aria-label="Du er tjekket ind">
             <p className="font-semibold">Du er tjekket ind siden {formatTime(openEntry.check_in_at)} · {formatDuration(Date.now() - new Date(openEntry.check_in_at).getTime())}</p>
+            {openEntry.job_id && <Link href={`/medarbejder/rapport/${openEntry.job_id}`} className="rounded-lg border border-primary px-4 py-3 text-center font-semibold text-primary">Udfyld rapport før du tjekker ud</Link>}
             <CheckOutForm entryId={String(openEntry.id)} />
           </section>
         )}
@@ -100,6 +105,7 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
                 <article key={s.id} className={`flex flex-col gap-3 rounded-xl border bg-background p-5 ${isCurrent ? "border-primary" : ""} ${s.status === "completed" ? "opacity-70" : ""}`}>
                   <ShiftInfo shift={s} />
                   {canCheckIn && <CheckInButton jobId={s.id} />}
+                  {(isCurrent || (day <= today && day >= addDays(today, -2))) && <Link href={`/medarbejder/rapport/${s.id}`} className="rounded-lg bg-primary px-4 py-4 text-center text-base font-semibold text-primary-foreground">Udfyld rengøringsrapport</Link>}
                 </article>
               )
             })}
