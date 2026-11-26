@@ -8,7 +8,6 @@ import { formatTime } from "@/lib/time"
 import PhotoUpload from "@/components/photo-upload"
 import { registerReportPhoto, reportUploadTarget, saveReport } from "../actions"
 import { getViewAs } from "@/lib/view-as"
-import ViewAsBanner from "@/components/view-as-banner"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Rengøringsrapport", robots: { index: false, follow: false } }
@@ -32,8 +31,7 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
   if (!reportId) {
     return (
       <>
-        {preview && <ViewAsBanner viewAs={preview} />}
-        <main className="field"><Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> Mine vagter</Link><p className="field-ok">{preview?.name} har ikke startet en rapport for denne vagt endnu.</p></main>
+        <main className="field"><Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> I dag</Link><p className="field-ok">{preview?.name} har ikke startet en rapport for denne vagt endnu.</p></main>
       </>
     )
   }
@@ -49,9 +47,8 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
 
   return (
     <>
-    {preview && <ViewAsBanner viewAs={preview} />}
     <main className={`field${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent }}>
-      <Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> Mine vagter</Link>
+      <Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> I dag</Link>
       <header className="field-head">
         <p>{org.name} · Rengøringsrapport</p>
         <h1>{job?.title || loc?.name || "Vagt"}</h1>
