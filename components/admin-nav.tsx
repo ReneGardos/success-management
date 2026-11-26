@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { BarChart3, Building2, CalendarDays, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { BarChart3, Building2, Eye, CalendarDays, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -26,6 +26,7 @@ const groups = [
   { title: "Team og system", links: [
     { href: "/admin/statistik", label: "Statistik", icon: BarChart3 },
     { href: "/admin/brugere", label: "Medarbejdere", icon: Users },
+    { href: "/admin/se-som", label: "Se som medarbejder/kunde", icon: Eye },
     { href: "/admin/hjemmesider", label: "Hjemmesider og API", icon: Globe },
     { href: "/admin/indstillinger", label: "Indstillinger", icon: Settings },
   ] },

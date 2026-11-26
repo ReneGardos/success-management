@@ -105,3 +105,11 @@
 .portal-score { display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #B54708; }
 .portal-score.is-full { color: #067647; }
 .portal-empty { margin: 0; color: #6B7280; }
+
+/* Admin preview banner ("Se som") */
+.viewas-bar { position: sticky; top: 0; z-index: 2000; display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 10px 16px; background: #111827; color: #fff; font: 500 .9rem var(--font-inter), system-ui, sans-serif; }
+.viewas-bar strong { font-weight: 700; }
+.viewas-bar a { color: #fff; text-decoration: underline; margin-left: auto; }
+.viewas-bar a + a { margin-left: 0; }
+.viewas-stop { background: #fff; color: #111827 !important; text-decoration: none !important; border-radius: 8px; padding: 4px 12px; font-weight: 700; }
+.viewas-readonly button[type=submit], .viewas-readonly .field-actions, .viewas-readonly .photo-up, .viewas-readonly form button { pointer-events: none; opacity: .45; }

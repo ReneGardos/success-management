@@ -8,9 +8,11 @@ import { mailConfigured, officeEmailFor } from "@/lib/backend/mail"
 import { pathAllowed, photoUploadTarget } from "@/lib/backend/reports"
 import { appUrl, orgSender } from "@/lib/org"
 import { customerIdsFor } from "@/lib/backend/customers"
+import { getViewAs } from "@/lib/view-as"
 
 export async function submitCustomerFeedback(formData: FormData) {
-  const { org, user } = await requireRoleAction(["customer", "admin"])
+  const { org, user, ctx } = await requireRoleAction(["customer", "admin"])
+  if (await getViewAs(ctx)) redirect("/kunde")
   const message = String(formData.get("message") ?? "").trim().slice(0, 2000)
   const locationId = String(formData.get("location_id") ?? "") || null
   if (message.length < 2) redirect("/kunde?fejl=1#feedback")

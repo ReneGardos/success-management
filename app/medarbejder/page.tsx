@@ -8,6 +8,8 @@ import { entryDurationMs, entryPlace, loadTimeEntries } from "@/lib/backend/time
 import { mapsLink } from "@/lib/geo"
 import { addDays, copenhagenToIso, dayKey, formatDay, formatDuration, formatTime, mondayOf, todayLocal } from "@/lib/time"
 import { CheckInButton, CheckOutForm, ClaimButton } from "@/components/employee-shift-actions"
+import { getViewAs } from "@/lib/view-as"
+import ViewAsBanner from "@/components/view-as-banner"
 
 export const metadata = privateMeta
 export const dynamic = "force-dynamic"
@@ -36,7 +38,12 @@ function ShiftInfo({ shift }: { shift: Shift }) {
 }
 
 export default async function EmployeePage({ searchParams }: { searchParams: Promise<{ vis?: string; rapport?: string; mangler?: string }> }) {
-  const { user, fullName, org, ctx } = await requireRolePage(["employee", "admin"], "/medarbejder")
+  const { user: me, fullName: myName, org, ctx } = await requireRolePage(["employee", "admin"], "/medarbejder")
+  // Admin preview: show the app as the chosen employee (read-only).
+  const viewAs = await getViewAs(ctx)
+  const preview = viewAs?.type === "employee" ? viewAs : null
+  const user = preview ? { id: preview.id, email: null as string | null } : me
+  const fullName = preview ? preview.name : myName
   const { vis = "vagter", rapport, mangler } = await searchParams
   const db = createAdminClient()
   const today = todayLocal()
@@ -63,7 +70,9 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
   const dayTitle = (day: string, s: Shift) => (day === today ? "I dag" : day === addDays(today, 1) ? "I morgen" : formatDay(s.scheduled_start!))
 
   return (
-    <main className="min-h-screen bg-secondary/30 px-4 pb-16 pt-10" style={{ ["--primary" as string]: org.color_primary, ["--ring" as string]: org.color_accent }}>
+    <>
+    {preview && <ViewAsBanner viewAs={preview} />}
+    <main className={`min-h-screen bg-secondary/30 px-4 pb-16 pt-10${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--ring" as string]: org.color_accent }}>
       <div className="mx-auto flex max-w-2xl flex-col gap-5">
         <div className="flex items-end justify-between gap-3">
           <div>
@@ -85,7 +94,7 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
           <section className="flex flex-col gap-3 rounded-xl border-2 border-primary bg-background p-5" aria-label="Du er tjekket ind">
             <p className="font-semibold">Du er tjekket ind siden {formatTime(openEntry.check_in_at)} · {formatDuration(Date.now() - new Date(openEntry.check_in_at).getTime())}</p>
             {openEntry.job_id && <Link href={`/medarbejder/rapport/${openEntry.job_id}`} className="rounded-lg border border-primary px-4 py-3 text-center font-semibold text-primary">Udfyld rapport før du tjekker ud</Link>}
-            <CheckOutForm entryId={String(openEntry.id)} />
+            {!preview && <CheckOutForm entryId={String(openEntry.id)} />}
           </section>
         )}
 
@@ -104,8 +113,8 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
               return (
                 <article key={s.id} className={`flex flex-col gap-3 rounded-xl border bg-background p-5 ${isCurrent ? "border-primary" : ""} ${s.status === "completed" ? "opacity-70" : ""}`}>
                   <ShiftInfo shift={s} />
-                  {canCheckIn && <CheckInButton jobId={s.id} />}
-                  {(isCurrent || (day <= today && day >= addDays(today, -2))) && <Link href={`/medarbejder/rapport/${s.id}`} className="rounded-lg bg-primary px-4 py-4 text-center text-base font-semibold text-primary-foreground">Udfyld rengøringsrapport</Link>}
+                  {canCheckIn && !preview && <CheckInButton jobId={s.id} />}
+                  {(isCurrent || (day <= today && day >= addDays(today, -2))) && <Link href={`/medarbejder/rapport/${s.id}${preview ? "?se=1" : ""}`} className="rounded-lg bg-primary px-4 py-4 text-center text-base font-semibold text-primary-foreground">Udfyld rengøringsrapport</Link>}
                 </article>
               )
             })}
@@ -119,7 +128,7 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
               <article key={s.id} className="flex flex-col gap-3 rounded-xl border bg-background p-5">
                 <ShiftInfo shift={s} />
                 <p className="text-sm text-muted-foreground">{s.max_staff - s.employeeIds.length} ledig{s.max_staff - s.employeeIds.length === 1 ? "" : "e"} plads{s.max_staff - s.employeeIds.length === 1 ? "" : "er"}</p>
-                <ClaimButton jobId={s.id} />
+                {!preview && <ClaimButton jobId={s.id} />}
               </article>
             ))}
           </section>
@@ -144,5 +153,6 @@ export default async function EmployeePage({ searchParams }: { searchParams: Pro
         )}
       </div>
     </main>
+    </>
   )
 }

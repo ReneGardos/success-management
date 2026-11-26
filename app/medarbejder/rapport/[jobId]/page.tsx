@@ -7,20 +7,36 @@ import { ensureReport, loadProducts, loadReport, photoKindLabels } from "@/lib/b
 import { formatTime } from "@/lib/time"
 import PhotoUpload from "@/components/photo-upload"
 import { registerReportPhoto, reportUploadTarget, saveReport } from "../actions"
+import { getViewAs } from "@/lib/view-as"
+import ViewAsBanner from "@/components/view-as-banner"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Rengøringsrapport", robots: { index: false, follow: false } }
 
 export default async function ReportForm({ params, searchParams }: { params: Promise<{ jobId: string }>; searchParams: Promise<{ gemt?: string }> }) {
   const { jobId } = await params
-  const { org, user } = await requireRolePage(["employee", "admin"], `/medarbejder/rapport/${jobId}`)
+  const { org, user: me, ctx } = await requireRolePage(["employee", "admin"], `/medarbejder/rapport/${jobId}`)
+  const viewAs = await getViewAs(ctx)
+  const preview = viewAs?.type === "employee" ? viewAs : null
+  const user = preview ? { id: preview.id } : me
   const sp = await searchParams
   if (!/^[0-9a-f-]{36}$/i.test(jobId)) notFound()
   const db = createAdminClient()
   const { data: assigned } = await db.from("job_assignments").select("job_id").eq("org_id", org.id).eq("job_id", jobId).eq("employee_id", user.id).maybeSingle()
   if (!assigned) notFound()
   const { data: job } = await db.from("jobs").select("id, title, scheduled_start, location:locations(name, address)").eq("org_id", org.id).eq("id", jobId).maybeSingle()
-  const reportId = await ensureReport(org.id, jobId, user.id)
+  // In preview nothing is created: show the employee's existing report, if any.
+  const reportId = preview
+    ? ((await db.from("cleaning_reports").select("id").eq("org_id", org.id).eq("job_id", jobId).eq("employee_id", user.id).maybeSingle()).data?.id as string | undefined)
+    : await ensureReport(org.id, jobId, user.id)
+  if (!reportId) {
+    return (
+      <>
+        {preview && <ViewAsBanner viewAs={preview} />}
+        <main className="field"><Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> Mine vagter</Link><p className="field-ok">{preview?.name} har ikke startet en rapport for denne vagt endnu.</p></main>
+      </>
+    )
+  }
   const [report, products, { data: entry }] = await Promise.all([
     loadReport(org.id, reportId),
     loadProducts(org.id),
@@ -32,7 +48,9 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
   const done = report.items.filter((i) => i.done).length
 
   return (
-    <main className="field" style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent }}>
+    <>
+    {preview && <ViewAsBanner viewAs={preview} />}
+    <main className={`field${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent }}>
       <Link href="/medarbejder" className="field-back"><ArrowLeft className="size-5" /> Mine vagter</Link>
       <header className="field-head">
         <p>{org.name} · Rengøringsrapport</p>
@@ -44,6 +62,7 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
       {report.status === "submitted" && <p className="field-ok" role="status">Rapporten er sendt. Du kan stadig rette den.</p>}
 
       <form action={saveReport} className="field-form">
+        <fieldset disabled={Boolean(preview)} style={{ border: 0, padding: 0, margin: 0, display: "grid", gap: 14 }}>
         <input type="hidden" name="report_id" value={report.id} />
         <section className="field-card">
           <h2>Opgaver <small>{done}/{report.items.length} udført</small></h2>
@@ -94,11 +113,12 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
           <button type="submit" name="intent" value="save" className="field-btn">Gem</button>
           <button type="submit" name="intent" value="submit" className="field-btn field-btn-primary">Send rapport</button>
         </div>
+        </fieldset>
       </form>
 
       <section className="field-card">
         <h2>Billeder</h2>
-        <PhotoUpload requestTarget={reportUploadTarget.bind(null, report.id)} register={registerReportPhoto.bind(null, report.id)} kinds={[{ value: "issue", label: "Problem" }, { value: "unusual", label: "Usædvanligt" }, { value: "before", label: "Før" }, { value: "after", label: "Efter" }]} />
+        {!preview && <PhotoUpload requestTarget={reportUploadTarget.bind(null, report.id)} register={registerReportPhoto.bind(null, report.id)} kinds={[{ value: "issue", label: "Problem" }, { value: "unusual", label: "Usædvanligt" }, { value: "before", label: "Før" }, { value: "after", label: "Efter" }]} />}
         {report.photos.length > 0 && (
           <div className="field-photos">
             {report.photos.map((ph) => ph.url && (
@@ -112,5 +132,6 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
         )}
       </section>
     </main>
+    </>
   )
 }
