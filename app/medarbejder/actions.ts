@@ -1,0 +1,96 @@
+"use server"
+
+import { revalidatePath } from "next/cache"
+import { requireRoleAction } from "@/lib/auth-guard"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { distanceMeters } from "@/lib/geo"
+
+type Position = { lat: number; lng: number; accuracy: number } | null
+
+function refresh() {
+  revalidatePath("/medarbejder")
+  revalidatePath("/admin", "layout")
+}
+
+async function assertAssigned(orgId: string, jobId: string, userId: string) {
+  // Everyone, admins included, checks in on shifts they are assigned to, in the active organization.
+  const { data } = await createAdminClient().from("job_assignments").select("job_id").eq("org_id", orgId).eq("job_id", jobId).eq("employee_id", userId).maybeSingle()
+  if (!data) throw new Error("Vagten er ikke din")
+}
+
+async function distanceToJob(orgId: string, jobId: string, pos: Position) {
+  if (!pos) return null
+  const { data } = await createAdminClient().from("jobs").select("location:locations(lat, lng)").eq("org_id", orgId).eq("id", jobId).maybeSingle()
+  const loc = data?.location as unknown as { lat: number | null; lng: number | null } | null
+  if (!loc || loc.lat === null || loc.lng === null) return null
+  return distanceMeters(pos.lat, pos.lng, loc.lat, loc.lng)
+}
+
+/** Take an open shift. */
+export async function claimShift(jobId: string) {
+  const { user, org } = await requireRoleAction(["employee", "admin"])
+  const db = createAdminClient()
+  const { data: job } = await db.from("jobs").select("id, is_open, max_staff, status, scheduled_start").eq("org_id", org.id).eq("id", jobId).maybeSingle()
+  if (!job || !job.is_open || job.status === "cancelled") return { ok: false, message: "Vagten er ikke ledig længere." }
+  const { data: current } = await db.from("job_assignments").select("employee_id").eq("org_id", org.id).eq("job_id", jobId)
+  if ((current ?? []).some((a) => a.employee_id === user.id)) return { ok: true, message: "Du er allerede på vagten." }
+  if ((current ?? []).length >= (job.max_staff ?? 1)) {
+    await db.from("jobs").update({ is_open: false }).eq("org_id", org.id).eq("id", jobId)
+    return { ok: false, message: "Vagten blev lige taget af en anden." }
+  }
+  const { error } = await db.from("job_assignments").insert({ org_id: org.id, job_id: jobId, employee_id: user.id })
+  if (error) return { ok: false, message: "Kunne ikke tage vagten. Prøv igen." }
+  if ((current ?? []).length + 1 >= (job.max_staff ?? 1)) await db.from("jobs").update({ is_open: false }).eq("org_id", org.id).eq("id", jobId)
+  refresh()
+  return { ok: true, message: "Vagten er din." }
+}
+
+export async function checkIn(jobId: string, pos: Position) {
+  const { user, org } = await requireRoleAction(["employee", "admin"])
+  try {
+    await assertAssigned(org.id, jobId, user.id)
+  } catch {
+    return { ok: false, message: "Vagten er ikke din." }
+  }
+  const db = createAdminClient()
+  const { data: openEntry } = await db.from("time_entries").select("id").eq("org_id", org.id).eq("employee_id", user.id).is("check_out_at", null).maybeSingle()
+  if (openEntry) return { ok: false, message: "Du er allerede tjekket ind et andet sted. Tjek ud først." }
+  const distance = await distanceToJob(org.id, jobId, pos)
+  const { error } = await db.from("time_entries").insert({
+    org_id: org.id,
+    job_id: jobId,
+    employee_id: user.id,
+    check_in_lat: pos?.lat ?? null,
+    check_in_lng: pos?.lng ?? null,
+    check_in_accuracy_m: pos?.accuracy ?? null,
+    check_in_distance_m: distance,
+  })
+  if (error) return { ok: false, message: "Kunne ikke tjekke ind. Prøv igen." }
+  await db.from("jobs").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", jobId).eq("status", "scheduled")
+  refresh()
+  return { ok: true, message: distance !== null ? `Tjekket ind (${distance} m fra stedet).` : "Tjekket ind." }
+}
+
+export async function checkOut(entryId: string, pos: Position, note: string, markDone: boolean) {
+  const { user, org } = await requireRoleAction(["employee", "admin"])
+  const db = createAdminClient()
+  const { data: entry } = await db.from("time_entries").select("id, job_id, employee_id").eq("org_id", org.id).eq("id", entryId).maybeSingle()
+  if (!entry || entry.employee_id !== user.id) return { ok: false, message: "Registreringen findes ikke." }
+  const distance = entry.job_id ? await distanceToJob(org.id, entry.job_id, pos) : null
+  const cleanNote = note.trim().slice(0, 2000)
+  const { error } = await db
+    .from("time_entries")
+    .update({ check_out_at: new Date().toISOString(), check_out_lat: pos?.lat ?? null, check_out_lng: pos?.lng ?? null, check_out_distance_m: distance, ...(cleanNote ? { note: cleanNote } : {}) })
+    .eq("org_id", org.id)
+    .eq("id", entryId)
+  if (error) return { ok: false, message: "Kunne ikke tjekke ud. Prøv igen." }
+  if (entry.job_id) {
+    await db
+      .from("jobs")
+      .update({ ...(markDone ? { status: "completed", completed_at: new Date().toISOString() } : {}), ...(cleanNote ? { employee_note: cleanNote } : {}), updated_at: new Date().toISOString() })
+      .eq("org_id", org.id)
+      .eq("id", entry.job_id)
+  }
+  refresh()
+  return { ok: true, message: "Tjekket ud. Tak for i dag!" }
+}
