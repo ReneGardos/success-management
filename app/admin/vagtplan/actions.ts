@@ -215,3 +215,49 @@ export async function assignEmployeeToDays(formData: FormData) {
   const none = targets.length === 0 ? " – der var ingen vagter på de valgte dage. Brug 'Opret nye vagter' i stedet." : ""
   redirect(`${back}${sep}tildelt=${encodeURIComponent(`Tildelt ${add.length} vagt${add.length === 1 ? "" : "er"}${none}`)}`)
 }
+
+/**
+ * Drag-and-drop on the board: move a shift to another day (same clock time) and/or
+ * from one employee row to another. `from`/`to` = "" means the "unstaffed" row.
+ */
+export async function moveShift(input: { jobId: string; toDate: string; from: string; to: string; copy?: boolean }): Promise<{ ok: boolean; message: string }> {
+  const { org } = await requireRoleAction(["admin"])
+  const { jobId, toDate, from, to } = input
+  const uuid = /^[0-9a-f-]{36}$/i
+  if (!uuid.test(jobId) || !/^\d{4}-\d{2}-\d{2}$/.test(toDate) || (from && !uuid.test(from)) || (to && !uuid.test(to))) return { ok: false, message: "Ugyldig flytning." }
+  const db = createAdminClient()
+  const { data: job } = await db.from("jobs").select("*").eq("org_id", org.id).eq("id", jobId).maybeSingle()
+  if (!job?.scheduled_start) return { ok: false, message: "Vagten findes ikke." }
+  if (to && !(await onlyStaff(org.id, [to])).length) return { ok: false, message: "Medarbejderen findes ikke." }
+  const time = new Date(job.scheduled_start).toLocaleTimeString("sv-SE", { timeZone: "Europe/Copenhagen", hour: "2-digit", minute: "2-digit" })
+  const start = copenhagenToIso(toDate, time)!
+  const dur = job.scheduled_end ? new Date(job.scheduled_end).getTime() - new Date(job.scheduled_start).getTime() : 0
+  const end = dur ? new Date(new Date(start).getTime() + dur).toISOString() : null
+  const when = new Date(start).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+
+  // Copy (Alt/⌥-drag): a new one-off shift on the target day/person.
+  if (input.copy) {
+    const { id: _id, created_at: _c, updated_at: _u, series_id: _s, completed_at: _d, ...rest } = job
+    const { data: made, error } = await db.from("jobs").insert({ ...rest, scheduled_start: start, scheduled_end: end, status: "scheduled", series_id: null }).select("id").single()
+    if (error || !made) return { ok: false, message: "Kunne ikke kopiere vagten." }
+    if (to) await db.from("job_assignments").insert({ org_id: org.id, job_id: made.id, employee_id: to })
+    if (to) await notifyUsers(org, [to], { kind: "shift", title: "Du har fået en ny vagt", body: when, href: "/medarbejder/vagter" })
+    refresh()
+    return { ok: true, message: `Kopieret til ${when}.` }
+  }
+
+  const moved = start !== new Date(job.scheduled_start).toISOString()
+  if (moved) await db.from("jobs").update({ scheduled_start: start, scheduled_end: end, updated_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", jobId)
+  const { data: current } = await db.from("job_assignments").select("employee_id").eq("org_id", org.id).eq("job_id", jobId)
+  const staffNow = new Set((current ?? []).map((c) => String(c.employee_id)))
+  if (from !== to) {
+    if (from) { await db.from("job_assignments").delete().eq("org_id", org.id).eq("job_id", jobId).eq("employee_id", from); staffNow.delete(from) }
+    if (to && !staffNow.has(to)) { await db.from("job_assignments").insert({ org_id: org.id, job_id: jobId, employee_id: to }); staffNow.add(to) }
+    await db.from("jobs").update({ is_open: staffNow.size < Number(job.max_staff ?? 1) ? job.is_open || !to : false }).eq("org_id", org.id).eq("id", jobId)
+    if (from) await notifyUsers(org, [from], { kind: "shift", title: "Du er taget af en vagt", body: when, href: "/medarbejder/vagter" })
+    if (to) await notifyUsers(org, [to], { kind: "shift", title: "Du har fået en ny vagt", body: when, href: "/medarbejder/vagter" })
+  }
+  if (moved) await notifyUsers(org, [...staffNow].filter((e) => e !== to), { kind: "shift", title: "En af dine vagter er flyttet", body: when, href: "/medarbejder/vagter" })
+  refresh()
+  return { ok: true, message: moved ? `Flyttet til ${when}.` : "Opdateret." }
+}
