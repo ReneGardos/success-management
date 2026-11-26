@@ -98,9 +98,6 @@ a.crm-kpi:hover { border-color: color-mix(in srgb, var(--adm-primary) 35%, var(-
 .crm-spark { flex: 0 0 auto; }
 
 /* Cards & grids */
-.crm-pairs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.crm-pairs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-.{ grid-column: span 2; }
 .crm-card { background: var(--crm-card); border: 1px solid var(--crm-line); border-radius: var(--crm-radius); padding: 18px; box-shadow: var(--crm-shadow); min-width: 0; }
 .crm-card-flush { padding: 0; overflow: hidden; }
 .crm-pad { padding: 16px 18px 0; }
@@ -111,8 +108,6 @@ a.crm-kpi:hover { border-color: color-mix(in srgb, var(--adm-primary) 35%, var(-
 .crm-empty { color: var(--crm-faint); font-size: .88rem; padding: 18px; margin: 0; text-align: center; }
 .crm-empty a { color: var(--adm-primary); font-weight: 600; }
 .crm-sub-title { display: flex; align-items: center; gap: 6px; color: var(--crm-muted); font-size: .78rem; font-weight: 600; margin: 4px 0 8px; }
-@media (max-width: 1100px) { .crm-pairs, .crm-pairs { grid-template-columns: 1fr 1fr; } .{ grid-column: span 2; } }
-@media (max-width: 720px) { .crm-pairs, .crm-pairs { grid-template-columns: 1fr; } .{ grid-column: auto; } }
 
 /* Charts */
 .crm-chart { width: 100%; height: auto; display: block; overflow: visible; }
