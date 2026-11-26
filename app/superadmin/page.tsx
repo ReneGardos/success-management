@@ -41,7 +41,10 @@ export default async function SuperadminPage({ searchParams }: { searchParams: P
               <details key={o.id} className="admin-location">
                 <summary>
                   <div><strong><Building2 className="size-4 inline" aria-hidden="true" /> {o.name}{o.active ? "" : " (deaktiveret)"}</strong><small>{o.slug} · {counts.get(o.id) ?? 0} personer · plan {o.plan} · {o.subscription_status}{o.mail_domain ? ` · @${o.mail_domain}${o.mail_domain_verified ? " ✓" : " (ikke verificeret)"}` : ""}</small></div>
-                  <a href={`/org/skift?org=${o.id}&next=/admin`} className="admin-view-site">Åbn</a>
+                  <span className="admin-inline-form">
+                    <a href={`/org/skift?org=${o.id}&next=/admin`} className="admin-view-site">Admin</a>
+                    <a href={`/org/skift?org=${o.id}&next=/admin/se-som`} className="admin-view-site">Se som medarbejder/kunde</a>
+                  </span>
                 </summary>
                 <div className="admin-location-body">
                   <form action={updateOrganizationPlatform} className="admin-form-grid">

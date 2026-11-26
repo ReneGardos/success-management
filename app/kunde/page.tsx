@@ -7,6 +7,8 @@ import { displayStatus, invoiceNo, invoiceStatusLabels } from "@/lib/backend/inv
 import PhotoUpload from "@/components/photo-upload"
 import { customerUploadTarget, registerCustomerPhoto, submitCustomerFeedback } from "./actions"
 import { customerIdsFor } from "@/lib/backend/customers"
+import { getViewAs } from "@/lib/view-as"
+import ViewAsBanner from "@/components/view-as-banner"
 
 export const metadata = { title: "Kundeportal", robots: { index: false, follow: false } }
 export const dynamic = "force-dynamic"
@@ -15,7 +17,9 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const { user, org, ctx } = await requireRolePage(["customer", "admin"], "/kunde")
   const sp = await searchParams
   const db = createAdminClient()
-  const customerIds = await customerIdsFor(org.id, user.id, user.email)
+  const viewAs = await getViewAs(ctx)
+  const preview = viewAs?.type === "customer" ? viewAs : null
+  const customerIds = preview ? [preview.id] : await customerIdsFor(org.id, user.id, user.email)
   const ids = customerIds.length ? customerIds : ["00000000-0000-0000-0000-000000000000"]
   const [{ data: locations }, { data: quotes }, { data: invoices }] = await Promise.all([
     db.from("locations").select("id, name, address").eq("org_id", org.id).in("customer_id", ids).order("name"),
@@ -33,10 +37,12 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
   const locName = new Map((locations ?? []).map((l) => [l.id, l.name]))
 
   return (
-    <main className="portal" style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent, background: org.color_background }}>
+    <>
+    {preview && <ViewAsBanner viewAs={preview} />}
+    <main className={`portal${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent, background: org.color_background }}>
       <div className="portal-wrap">
         <header className="portal-head">
-          <div><p>{org.name} · Kundeportal</p><h1>Rengøring, tilbud og fakturaer</h1></div>
+          <div><p>{org.name} · Kundeportal</p><h1>{preview ? preview.name : "Rengøring, tilbud og fakturaer"}</h1></div>
           <div className="portal-head-actions">
             {ctx.memberships.length > 1 && <Link href="/vaelg-virksomhed?skift=1">Skift virksomhed</Link>}
             <form action="/auth/sign-out" method="post"><button type="submit">Log ud</button></form>
@@ -86,7 +92,8 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
               <p><Link href="/kunde#feedback">Skriv en ny besked</Link></p>
             </>
           ) : (
-            <form action={submitCustomerFeedback} className="rv-form">
+            <form action={submitCustomerFeedback} className="rv-form" aria-disabled={Boolean(preview)}>
+              {preview && <p className="portal-empty">Formularen er slået fra i visning.</p>}
               {(locations?.length ?? 0) > 1 && <select name="location_id" defaultValue=""><option value="">Vælg sted</option>{locations!.map((l) => <option key={l.id} value={l.id}>{l.name}</option>)}</select>}
               {locations?.length === 1 && <input type="hidden" name="location_id" value={locations[0].id} />}
               <textarea name="message" rows={4} required placeholder="Beskriv hvad der skal forbedres" />
@@ -96,5 +103,6 @@ export default async function CustomerPage({ searchParams }: { searchParams: Pro
         </section>
       </div>
     </main>
+    </>
   )
 }
