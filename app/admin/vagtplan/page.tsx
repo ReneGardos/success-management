@@ -7,6 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { mapsLink } from "@/lib/geo"
 import { addDays, copenhagenToIso, dayKey, formatTime, mondayOf, todayLocal, weekNumber } from "@/lib/time"
 import ShiftCalendar, { type CalendarDay, type CalendarShift } from "@/components/shift-calendar"
+import ShiftBoard, { type BoardShift } from "@/components/shift-board"
 
 import { deleteShift, updateShift } from "./actions"
 
@@ -31,7 +32,8 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
   const { org } = await requireRolePage(["admin"], "/admin/vagtplan")
   const sp = await searchParams
   const today = todayLocal()
-  const view = sp.visning === "uge" ? "week" : "month"
+  const view: "week" | "month" | "board" = sp.visning === "uge" ? "week" : sp.visning === "maaned" || sp.ny ? "month" : "board"
+  const vis = view === "week" ? "uge" : view === "board" ? "tavle" : "maaned"
   const anchor = isDay(sp.dato) ? sp.dato! : today
 
   // Visible range: a full month grid (Mon–Sun, 6 weeks) or one week.
@@ -40,7 +42,7 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
   const dayCount = view === "month" ? 42 : 7
   const days: CalendarDay[] = Array.from({ length: dayCount }, (_, i) => {
     const date = addDays(gridStart, i)
-    return { date, inMonth: view === "week" || date.slice(0, 7) === anchor.slice(0, 7), isToday: date === today }
+    return { date, inMonth: view !== "month" || date.slice(0, 7) === anchor.slice(0, 7), isToday: date === today }
   })
   const from = copenhagenToIso(gridStart, "00:00")!
   const to = copenhagenToIso(addDays(gridStart, dayCount), "00:00")!
@@ -77,12 +79,30 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
   const totalHours = visibleShifts.reduce((sum, s) => sum + (s.scheduled_start && s.scheduled_end ? ((new Date(s.scheduled_end).getTime() - new Date(s.scheduled_start).getTime()) / 3600000) * Math.max(1, s.employeeIds.length) : 0), 0)
   const understaffed = visibleShifts.filter((s) => s.status !== "cancelled" && s.employeeIds.length < s.max_staff).length
 
-  const base = `/admin/vagtplan?visning=${view === "week" ? "uge" : "maaned"}&dato=${anchor}${focus ? `&medarbejder=${focus}` : ""}`
+  const base = `/admin/vagtplan?visning=${vis}&dato=${anchor}${focus ? `&medarbejder=${focus}` : ""}`
   const keep = focus ? `&medarbejder=${focus}` : ""
   const prev = view === "month" ? shiftMonth(anchor, -1) : addDays(anchor, -7)
   const next = view === "month" ? shiftMonth(anchor, 1) : addDays(anchor, 7)
   const title = view === "month" ? monthLabel(anchor) : `Uge ${weekNumber(gridStart)} · ${monthLabel(gridStart)}`
   const selected: Shift | undefined = sp.vagt ? shifts.find((s) => s.id === sp.vagt) : undefined
+
+  // Board (week, one row per person)
+  const boardDays = days.map((d) => ({ date: d.date, isToday: d.isToday, label: new Date(`${d.date}T12:00:00Z`).toLocaleDateString("da-DK", { weekday: "short", day: "numeric", month: "short", timeZone: "UTC" }) }))
+  const boardShifts: BoardShift[] = shifts.filter((s) => s.scheduled_start).map((s) => ({
+    id: s.id,
+    date: dayKey(s.scheduled_start!),
+    time: `${localTime(s.scheduled_start)}${s.scheduled_end ? `–${localTime(s.scheduled_end)}` : ""}`,
+    hours: s.scheduled_end ? (new Date(s.scheduled_end).getTime() - new Date(s.scheduled_start!).getTime()) / 3600000 : 0,
+    name: shiftName(s),
+    status: s.status,
+    missing: s.status === "cancelled" ? 0 : Math.max(0, s.max_staff - s.employeeIds.length),
+    isOpen: s.is_open,
+    employeeIds: s.employeeIds,
+    checkedIn: s.employeeIds.filter((e) => checkedIn.has(`${s.id}|${e}`)),
+  }))
+  const absentDays = (emp: string) => days.filter((d) => absentOn(emp, d.date)).map((d) => d.date)
+  const inNow = (openEntries ?? []).length
+  const openSlots = visibleShifts.filter((s) => s.status !== "cancelled" && s.is_open && s.employeeIds.length < s.max_staff).length
 
   return (
     <main className="admin-shell">
@@ -94,15 +114,24 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
           </div>
           <div className="admin-week-nav">
             <div className="cal-switch" role="group" aria-label="Visning">
+              <Link href={`?visning=tavle&dato=${anchor}${keep}`} aria-current={view === "board" ? "page" : undefined}>Tavle</Link>
               <Link href={`?visning=maaned&dato=${anchor}${keep}`} aria-current={view === "month" ? "page" : undefined}>Måned</Link>
               <Link href={`?visning=uge&dato=${anchor}${keep}`} aria-current={view === "week" ? "page" : undefined}>Uge</Link>
             </div>
-            <Link href={`?visning=${view === "week" ? "uge" : "maaned"}&dato=${prev}${keep}`} aria-label="Forrige"><ChevronLeft className="size-4" /></Link>
-            <Link href={`?visning=${view === "week" ? "uge" : "maaned"}&dato=${today}${keep}`}>I dag</Link>
-            <Link href={`?visning=${view === "week" ? "uge" : "maaned"}&dato=${next}${keep}`} aria-label="Næste"><ChevronRight className="size-4" /></Link>
+            <Link href={`?visning=${vis}&dato=${prev}${keep}`} aria-label="Forrige"><ChevronLeft className="size-4" /></Link>
+            <Link href={`?visning=${vis}&dato=${today}${keep}`}>I dag</Link>
+            <Link href={`?visning=${vis}&dato=${next}${keep}`} aria-label="Næste"><ChevronRight className="size-4" /></Link>
           </div>
         </div>
 
+        <section className="vp-kpis">
+          <div><small>Vagter</small><strong>{visibleShifts.filter((s) => s.status !== "cancelled").length}</strong></div>
+          <div><small>Planlagte timer</small><strong>{Math.round(totalHours)}</strong></div>
+          <div className={understaffed ? "is-warn" : ""}><small>Mangler folk</small><strong>{understaffed}</strong></div>
+          <div><small>Ledige pladser</small><strong>{openSlots}</strong></div>
+          <div><small>Fravær</small><strong>{(absences ?? []).filter((a) => a.status === "approved").length}</strong></div>
+          <div className={inNow ? "is-live" : ""}><small>Tjekket ind nu</small><strong>{inNow}</strong></div>
+        </section>
         {sp.oprettet && <p className="admin-notice is-ok" role="status">{sp.oprettet} vagt{sp.oprettet === "1" ? "" : "er"} oprettet.</p>}
         {sp.gemt && <p className="admin-notice is-ok" role="status">Vagten er gemt.</p>}
         {sp.tildelt && <p className="admin-notice is-ok" role="status">{sp.tildelt}.</p>}
@@ -152,15 +181,23 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
         {staff.length > 0 && (
           <nav className="cal-filter" aria-label="Vis medarbejder">
             <span>Vis:</span>
-            <Link href={`?visning=${view === "week" ? "uge" : "maaned"}&dato=${anchor}`} aria-current={!focus ? "page" : undefined}>Alle</Link>
+            <Link href={`?visning=${vis}&dato=${anchor}`} aria-current={!focus ? "page" : undefined}>Alle</Link>
             {staff.map((p) => (
-              <Link key={p.id} href={`?visning=${view === "week" ? "uge" : "maaned"}&dato=${anchor}&medarbejder=${p.id}`} aria-current={focus === p.id ? "page" : undefined}>
+              <Link key={p.id} href={`?visning=${vis}&dato=${anchor}&medarbejder=${p.id}`} aria-current={focus === p.id ? "page" : undefined}>
                 <i className="cal-swatch" style={{ background: colorOf.get(p.id) }} /> {p.name.split(" ")[0]}
               </Link>
             ))}
           </nav>
         )}
 
+        {view === "board" ? (
+          <ShiftBoard
+            days={boardDays}
+            shifts={boardShifts}
+            editHref={`${base}&vagt=`}
+            people={staff.filter((p) => !focus || p.id === focus).map((p) => ({ id: p.id, name: p.name, color: colorOf.get(p.id) ?? "#697987", absent: absentDays(p.id) }))}
+          />
+        ) : (
         <ShiftCalendar
           days={days}
           shifts={byDay}
@@ -174,7 +211,8 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
           initialSelected={sp.ny && isDay(sp.dato) ? [sp.dato!] : sp.ny ? [today] : []}
           today={today}
         />
-        <p className="admin-legend">Prikker = medarbejdere (farve pr. person) · <span className="is-in">grøn kant</span> = tjekket ind nu · <span className="is-open">guld</span> = ledig vagt · <span className="is-missing">rød</span> = mangler folk</p>
+        )}
+        {view !== "board" && <p className="admin-legend">Prikker = medarbejdere (farve pr. person) · <span className="is-in">grøn kant</span> = tjekket ind nu · <span className="is-open">guld</span> = ledig vagt · <span className="is-missing">rød</span> = mangler folk</p>}
       </div>
     </main>
   )
