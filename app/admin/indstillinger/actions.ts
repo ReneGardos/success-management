@@ -83,6 +83,13 @@ export async function saveOrganization(formData: FormData) {
       mail_from_name: text(formData, "mail_from_name", 80),
       quote_default_intro: text(formData, "quote_default_intro", 2000),
       quote_default_terms: text(formData, "quote_default_terms", 4000),
+      invoice_prefix: text(formData, "invoice_prefix", 10),
+      payment_terms_days: Math.min(120, Math.max(0, Number(text(formData, "payment_terms_days", 4)) || 8)),
+      bank_reg: text(formData, "bank_reg", 8)?.replace(/\D/g, "") || null,
+      bank_account: text(formData, "bank_account", 20)?.replace(/\D/g, "") || null,
+      iban: text(formData, "iban", 40)?.replace(/\s/g, "").toUpperCase() || null,
+      mobilepay: text(formData, "mobilepay", 20),
+      invoice_footer: text(formData, "invoice_footer", 500),
       updated_at: new Date().toISOString(),
     })
     .eq("id", org.id)

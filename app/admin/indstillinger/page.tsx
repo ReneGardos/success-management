@@ -57,6 +57,16 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 <label>Afsendernavn<input name="mail_from_name" defaultValue={org.mail_from_name ?? ""} placeholder={org.name} /></label>
                 <p className="admin-form-hint">Mails sendes som <strong>{orgSender(org)}</strong>.{org.mail_domain_verified ? "" : " Eget domæne aktiveres af superadmin, når det er verificeret i Resend."}</p>
               </div>
+              <h2 id="faktura">Fakturering</h2>
+              <div className="admin-form-grid">
+                <label>Reg.nr.<input name="bank_reg" defaultValue={org.bank_reg ?? ""} inputMode="numeric" /></label>
+                <label>Kontonr.<input name="bank_account" defaultValue={org.bank_account ?? ""} inputMode="numeric" /></label>
+                <label>IBAN<input name="iban" defaultValue={org.iban ?? ""} /></label>
+                <label>MobilePay (valgfri)<input name="mobilepay" defaultValue={org.mobilepay ?? ""} /></label>
+                <label>Betalingsfrist (dage)<input name="payment_terms_days" type="number" min={0} max={120} defaultValue={org.payment_terms_days ?? 8} /></label>
+                <label>Præfiks for fakturanr. (valgfri)<input name="invoice_prefix" defaultValue={org.invoice_prefix ?? ""} placeholder="Fx SC-" /></label>
+                <label className="span-2">Tekst nederst på fakturaen<input name="invoice_footer" defaultValue={org.invoice_footer ?? ""} placeholder="Tak for samarbejdet." /></label>
+              </div>
               <h2>Standardtekster i tilbud</h2>
               <div className="admin-form-grid">
                 <label className="span-2">Indledning<textarea name="quote_default_intro" rows={3} defaultValue={org.quote_default_intro ?? defaultIntro} /></label>

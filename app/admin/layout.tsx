@@ -2,6 +2,7 @@ import AdminNav from "@/components/admin-nav"
 import { requireRolePage } from "@/lib/auth-guard"
 import { brandStyle } from "@/lib/brand"
 import "./admin-theme.css"
+import "./crm.css"
 
 export const metadata = { title: { default: "Administration", template: "%s · Success Management" }, robots: { index: false, follow: false } }
 
