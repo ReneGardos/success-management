@@ -59,7 +59,7 @@ export default async function LocationsPage({ searchParams }: { searchParams: Pr
                 <span className={`admin-badge ${l.lat !== null ? "" : "status-new"}`}>{l.lat !== null ? `Position · ${l.radius_m} m` : "Mangler position"}</span>
               </summary>
               <div className="admin-location-body">
-                <p className="admin-inline-form"><a href={mapsLink(l.address)} target="_blank" rel="noreferrer">Vis på kort</a> <UseMyPosition id={l.id} /></p>
+                <p className="admin-inline-form"><a href={`/admin/steder/${l.id}`} className="admin-primary">Tjekliste og produkter</a> <a href={mapsLink(l.address)} target="_blank" rel="noreferrer">Vis på kort</a> <UseMyPosition id={l.id} /></p>
                 <form action={saveLocation}><LocationFields location={l} /></form>
                 <form action={toggleLocation} className="admin-job-delete">
                   <input type="hidden" name="id" value={l.id} />

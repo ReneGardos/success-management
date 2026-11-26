@@ -58,8 +58,8 @@ export default async function CustomerPage({ params, searchParams }: { params: P
         <div className="crm-kpi"><div className="crm-kpi-top"><span>Steder</span></div><div className="crm-kpi-row"><strong>{locations?.length ?? 0}</strong></div></div>
       </section>
 
-      <div className="crm-grid-3">
-        <div className="crm-span-2 grid gap-4 content-start">
+      <div className="crm-pairs">
+        <div className="grid gap-4 content-start">
           <article className="crm-card crm-card-flush">
             <header className="crm-card-head crm-pad"><div><h2>Fakturaer</h2></div><form action={createInvoice}><input type="hidden" name="customer_id" value={c.id} /><button className="crm-link" type="submit"><FilePlus2 className="size-3" /> Ny</button></form></header>
             {invoices?.length ? (

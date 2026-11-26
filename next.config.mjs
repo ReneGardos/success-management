@@ -14,7 +14,7 @@ const nextConfig = {
   async headers() {
     return [
       { source: "/(.*)", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
-      { source: "/:area(admin|medarbejder|kunde|auth|t|f|superadmin|vaelg-virksomhed|org)/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+      { source: "/:area(admin|medarbejder|kunde|auth|t|f|r|superadmin|vaelg-virksomhed|org)/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
     ]
   },
 }

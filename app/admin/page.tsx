@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { ArrowUpRight, BarChart3, Receipt, CalendarDays, CheckCircle2, CircleAlert, Clock, Eye, FileSignature, Inbox, LogIn, Mail, MessageSquare, Plus, TrendingUp, Users } from "lucide-react"
+import { ArrowUpRight, BarChart3, PackageOpen, Receipt, CalendarDays, CheckCircle2, CircleAlert, Clock, Eye, FileSignature, Inbox, LogIn, Mail, MessageSquare, Plus, TrendingUp, Users } from "lucide-react"
 import { requireRolePage } from "@/lib/auth-guard"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { loadShifts, shiftName } from "@/lib/backend/shifts"
@@ -50,7 +50,7 @@ export default async function AdminDashboard() {
   const weekStart = mondayOf(today)
   const eightWeeksAgo = addDays(weekStart, -7 * 7)
 
-  const [requests, views, quotes, leads, entries, mails, { shifts: todayShifts }, { staff }, openEntriesRes, openShiftsRes, invoicesRes] = await Promise.all([
+  const [requests, views, quotes, leads, entries, mails, { shifts: todayShifts }, { staff }, openEntriesRes, openShiftsRes, invoicesRes, supplyRes, feedbackRes] = await Promise.all([
     db.from("contact_requests").select("id, name, company, created_at, status").eq("org_id", orgId).gte("created_at", since60).order("created_at", { ascending: false }).limit(2000),
     db.from("page_views").select("path, referrer_host, visitor_hash, created_at").eq("org_id", orgId).gte("created_at", since60).limit(50000),
     db.from("quotes").select("id, quote_number, status, total, billing, recipient_company, recipient_name, created_at, sent_at, viewed_at, accepted_at").eq("org_id", orgId).order("created_at", { ascending: false }).limit(1000),
@@ -62,7 +62,10 @@ export default async function AdminDashboard() {
     db.from("time_entries").select("job_id, employee_id, check_in_at").eq("org_id", orgId).is("check_out_at", null),
     db.from("jobs").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("is_open", true).neq("status", "cancelled").gte("scheduled_start", new Date().toISOString()),
     db.from("invoices").select("total, due_date").eq("org_id", orgId).eq("status", "sent").limit(5000),
+    db.from("supply_requests").select("urgent").eq("org_id", orgId).neq("status", "done").limit(1000),
+    db.from("customer_feedback").select("id", { count: "exact", head: true }).eq("org_id", orgId).eq("status", "open"),
   ])
+  const openSupply = supplyRes.data ?? []
   const unpaidInvoices = invoicesRes.data ?? []
   const outstanding = unpaidInvoices.reduce((s, i) => s + Number(i.total), 0)
   const overdueCount = unpaidInvoices.filter((i) => i.due_date && i.due_date < today).length
@@ -169,6 +172,7 @@ export default async function AdminDashboard() {
     { label: "Besøgende · 30 dage", value: vis30.toLocaleString("da-DK"), delta: <Delta now={vis30} before={visPrev} />, spark: visitorSeries, icon: Eye, href: "/admin/statistik" },
     { label: "Ny månedlig omsætning", value: kr(mrrNew).replace(",00 kr.", " kr."), delta: <Delta now={mrrNew} before={mrrPrev} />, spark: null, icon: TrendingUp, href: "/admin/tilbud?vis=accepted", sub: `${kr(mrrTotal).replace(",00 kr.", " kr.")} pr. md. i alt` },
     { label: "Udestående fakturaer", value: kr(outstanding).replace(",00 kr.", " kr."), delta: overdueCount ? <span className="crm-delta is-down">{overdueCount} forfaldne</span> : <span className="crm-delta is-up">Intet forfaldent</span>, spark: null, icon: Receipt, href: "/admin/fakturaer?vis=sent", sub: `${unpaidInvoices.length} ubetalte` },
+    { label: "Mangler og feedback", value: String(openSupply.length + (feedbackRes.count ?? 0)), delta: openSupply.some((r) => r.urgent) ? <span className="crm-delta is-down">{openSupply.filter((r) => r.urgent).length} haster</span> : <span className="crm-delta is-flat">{openSupply.length} mangler</span>, spark: null, icon: PackageOpen, href: "/admin/forsyning", sub: `${feedbackRes.count ?? 0} kundefeedback` },
     { label: `Timer · uge ${weekNumber(weekStart)}`, value: hoursThis.toLocaleString("da-DK", { maximumFractionDigits: 1 }), delta: <Delta now={hoursThis} before={hoursLast} />, spark: hoursPerWeek, icon: Clock, href: "/admin/timer" },
   ]
 
@@ -212,8 +216,8 @@ export default async function AdminDashboard() {
         ))}
       </section>
 
-      <section className="crm-grid-2">
-        <article className="crm-card crm-span-2">
+      <section className="crm-pairs">
+        <article className="crm-card">
           <header className="crm-card-head">
             <div><h2>Henvendelser og besøgende</h2><p>Seneste 30 dage</p></div>
             <ul className="crm-legend"><li><i style={{ background: org.color_primary }} />Besøgende</li><li><i style={{ background: org.color_accent }} />Henvendelser</li></ul>
@@ -230,7 +234,7 @@ export default async function AdminDashboard() {
         </article>
       </section>
 
-      <section className="crm-grid-3">
+      <section className="crm-pairs">
         <article className="crm-card">
           <header className="crm-card-head"><div><h2>Salgspipeline</h2><p>{openLeads} åbne leads</p></div><Link href="/admin/leads" className="crm-link">Pipeline <ArrowUpRight className="size-3" /></Link></header>
           <HBars rows={pipeline} color={org.color_primary} />
@@ -239,6 +243,10 @@ export default async function AdminDashboard() {
           <header className="crm-card-head"><div><h2>Timer pr. uge</h2><p>Seneste 8 uger</p></div><Link href="/admin/timer" className="crm-link">Timer <ArrowUpRight className="size-3" /></Link></header>
           <BarChart values={hoursPerWeek.map((h) => Math.round(h * 10) / 10)} labels={weeks.map((w) => `U${weekNumber(w)}`)} color={org.color_primary} unit=" t" />
         </article>
+
+      </section>
+
+      <section className="crm-pairs">
         <article className="crm-card">
           <header className="crm-card-head"><div><h2>Aktivitet</h2><p>Det sker lige nu</p></div></header>
           {activity.length ? (
@@ -255,10 +263,21 @@ export default async function AdminDashboard() {
             </ol>
           ) : <p className="crm-empty">Ingen aktivitet endnu.</p>}
         </article>
+        <article className="crm-card">
+          <header className="crm-card-head"><div><h2>Hjemmesiden</h2><p>Seneste 30 dage</p></div><Link href="/admin/statistik" className="crm-link">Statistik <ArrowUpRight className="size-3" /></Link></header>
+          {topPages.length ? (
+            <>
+              <p className="crm-sub-title"><BarChart3 className="size-3.5" /> Mest besøgte sider</p>
+              <HBars rows={topPages} color={org.color_accent} />
+              <p className="crm-sub-title"><Users className="size-3.5" /> Hvor de kommer fra</p>
+              <HBars rows={topSources} color={org.color_muted} />
+            </>
+          ) : <p className="crm-empty">Ingen besøg målt endnu. <Link href="/admin/hjemmesider">Forbind hjemmesiden</Link></p>}
+        </article>
       </section>
 
-      <section className="crm-grid-3">
-        <article className="crm-card crm-span-2">
+      <section className="crm-pairs">
+        <article className="crm-card">
           <header className="crm-card-head"><div><h2>Dagens vagter</h2><p>{todayShifts.length} vagter · {openEntries.length} tjekket ind · {openShiftsRes.count ?? 0} ledige fremover</p></div><Link href="/admin/vagtplan" className="crm-link">Vagtplan <ArrowUpRight className="size-3" /></Link></header>
           {todayShifts.length ? (
             <table className="crm-table">
@@ -280,17 +299,6 @@ export default async function AdminDashboard() {
               </tbody>
             </table>
           ) : <p className="crm-empty">Ingen vagter i dag. <Link href="/admin/vagtplan?ny=1">Opret en vagt</Link></p>}
-        </article>
-        <article className="crm-card">
-          <header className="crm-card-head"><div><h2>Hjemmesiden</h2><p>Seneste 30 dage</p></div><Link href="/admin/statistik" className="crm-link">Statistik <ArrowUpRight className="size-3" /></Link></header>
-          {topPages.length ? (
-            <>
-              <p className="crm-sub-title"><BarChart3 className="size-3.5" /> Mest besøgte sider</p>
-              <HBars rows={topPages} color={org.color_accent} />
-              <p className="crm-sub-title"><Users className="size-3.5" /> Hvor de kommer fra</p>
-              <HBars rows={topSources} color={org.color_muted} />
-            </>
-          ) : <p className="crm-empty">Ingen besøg målt endnu. <Link href="/admin/hjemmesider">Forbind hjemmesiden</Link></p>}
         </article>
       </section>
 

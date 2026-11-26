@@ -43,7 +43,7 @@ export default async function SearchPage({ searchParams }: { searchParams: Promi
     <main className="admin-shell crm">
       <header className="crm-head"><div><p className="crm-kicker">{org.name}</p><h1>Søg</h1><p className="crm-head-sub">{q.length >= 2 ? `${total} resultater for “${q}”` : "Skriv mindst to tegn i søgefeltet øverst."}</p></div></header>
       <form className="crm-search-big" role="search"><input name="q" defaultValue={raw} autoFocus placeholder="Kunde, email, tilbudsnr., fakturanr., adresse…" aria-label="Søg" /></form>
-      <div className="crm-grid-2">
+      <div className="crm-pairs">
         {groups.filter((g) => g.hits.length).map(({ label, icon: Icon, hits }) => (
           <article className="crm-card" key={label}>
             <header className="crm-card-head"><div><h2><Icon className="size-4 inline" /> {label}</h2></div></header>

@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import { requireRoleAction } from "@/lib/auth-guard"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { button, senderFor, sendAdminEmail } from "@/lib/backend/mail"
-import { defaultIntro, defaultTerms, kr, loadQuote, totals, type QuoteLine } from "@/lib/backend/quotes"
+import { defaultIntro, defaultTerms, kr, loadQuote, splitTotals, totals, type QuoteLine } from "@/lib/backend/quotes"
 import { appUrl, type Org } from "@/lib/org"
 
 const text = (formData: FormData, key: string) => String(formData.get(key) ?? "").trim()
@@ -39,10 +39,11 @@ function readLines(formData: FormData): QuoteLine[] {
   const quantities = formData.getAll("line_quantity").map(String)
   const units = formData.getAll("line_unit").map(String)
   const prices = formData.getAll("line_price").map(String)
+  const recurring = formData.getAll("line_recurring").map(String)
   // Number inputs always submit dot decimals ("1250.5"); also accept a typed comma.
   const num = (v: string) => Number(v.replace(/\s/g, "").replace(",", ".")) || 0
   return descriptions
-    .map((description, i) => ({ description: description.trim(), quantity: num(quantities[i] ?? "1") || 1, unit: (units[i] ?? "stk").trim() || "stk", unit_price: num(prices[i] ?? "0"), position: i }))
+    .map((description, i) => ({ description: description.trim(), quantity: num(quantities[i] ?? "1") || 1, unit: (units[i] ?? "stk").trim() || "stk", unit_price: num(prices[i] ?? "0"), position: i, recurring: recurring[i] === "true" ? true : recurring[i] === "false" ? false : null }))
     .filter((l) => l.description)
 }
 
@@ -105,10 +106,12 @@ export async function sendQuote(formData: FormData) {
   if (!quote.lines.length) redirect(`${editor(id)}?fejl=${encodeURIComponent("Tilføj mindst én linje.")}`)
 
   const link = `${appUrl()}/t/${quote.public_token}`
-  const { subtotal } = totals(quote.lines, quote.vat_rate)
+  const split = splitTotals(quote.lines, quote.vat_rate, quote.billing)
   const firstName = (quote.recipient_name ?? "").split(" ")[0]
   const message = text(formData, "message") || `Hej${firstName ? ` ${firstName}` : ""}\n\nTak for en god dialog. Hermed vores ${quote.title?.toLowerCase() || "tilbud"}.\n\nI kan se hele tilbuddet og acceptere det direkte via knappen herunder. Tilbuddet kan også gemmes som PDF.`
-  const summary = `Tilbud nr. ${quote.quote_number} · ${kr(subtotal)} ekskl. moms${quote.billing === "one_time" ? "" : " pr. måned"}`
+  const summary = split.mixed
+    ? `Tilbud nr. ${quote.quote_number} · ${kr(split.monthly.subtotal)} ekskl. moms pr. måned + engangsopgaver ${kr(split.oneOff.subtotal)}`
+    : `Tilbud nr. ${quote.quote_number} · ${kr(quote.billing === "one_time" ? split.oneOff.subtotal : split.monthly.subtotal)} ekskl. moms${quote.billing === "one_time" ? "" : " pr. måned"}`
   try {
     await sendAdminEmail({
       org,
@@ -145,7 +148,7 @@ export async function duplicateQuote(formData: FormData) {
     .select("id")
     .single()
   if (!data) redirect("/admin/tilbud")
-  if (source.lines.length) await db.from("quote_line_items").insert(source.lines.map(({ description, quantity, unit, unit_price, position }) => ({ org_id: org.id, quote_id: data.id, description, quantity, unit, unit_price, position })))
+  if (source.lines.length) await db.from("quote_line_items").insert(source.lines.map(({ description, quantity, unit, unit_price, position, recurring }) => ({ org_id: org.id, quote_id: data.id, description, quantity, unit, unit_price, position, recurring: recurring ?? null })))
   redirect(editor(data.id))
 }
 

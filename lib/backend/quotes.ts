@@ -1,6 +1,6 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 
-export type QuoteLine = { id?: string; description: string; quantity: number; unit: string; unit_price: number; position: number }
+export type QuoteLine = { id?: string; description: string; quantity: number; unit: string; unit_price: number; position: number; recurring?: boolean | null }
 export type Quote = {
   id: string
   org_id: string
@@ -51,11 +51,19 @@ export function totals(lines: QuoteLine[], vatRate: number) {
   return { subtotal, vat, total: subtotal + vat }
 }
 
+/** Totals split into the fixed monthly part and one-off work. Lines without a flag follow the quote's billing. */
+export function splitTotals(lines: QuoteLine[], vatRate: number, billing: string) {
+  const isRecurring = (l: QuoteLine) => (l.recurring === null || l.recurring === undefined ? billing !== "one_time" : l.recurring)
+  const monthlyLines = lines.filter(isRecurring)
+  const oneOffLines = lines.filter((l) => !isRecurring(l))
+  return { monthly: totals(monthlyLines, vatRate), oneOff: totals(oneOffLines, vatRate), monthlyLines, oneOffLines, mixed: monthlyLines.length > 0 && oneOffLines.length > 0 }
+}
+
 export const kr = (value: number) => `${value.toLocaleString("da-DK", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} kr.`
 
 async function withLines(row: Record<string, unknown> | null): Promise<Quote | null> {
   if (!row) return null
-  const { data: lines } = await createAdminClient().from("quote_line_items").select("id, description, quantity, unit, unit_price, position").eq("org_id", row.org_id as string).eq("quote_id", row.id as string).order("position")
+  const { data: lines } = await createAdminClient().from("quote_line_items").select("id, description, quantity, unit, unit_price, position, recurring").eq("org_id", row.org_id as string).eq("quote_id", row.id as string).order("position")
   return { ...(row as unknown as Quote), vat_rate: Number(row.vat_rate ?? 25), lines: (lines ?? []).map((l) => ({ ...l, quantity: Number(l.quantity), unit_price: Number(l.unit_price) })) as QuoteLine[] }
 }
 

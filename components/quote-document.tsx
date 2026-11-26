@@ -1,4 +1,4 @@
-import { billingLabel, kr, totals, type Quote } from "@/lib/backend/quotes"
+import { billingLabel, kr, splitTotals, totals, type Quote, type QuoteLine } from "@/lib/backend/quotes"
 import type { Org } from "@/lib/org"
 
 const fmtDate = (value: string | null) => (value ? new Date(value.length === 10 ? `${value}T12:00:00Z` : value).toLocaleDateString("da-DK", { day: "numeric", month: "long", year: "numeric", timeZone: "Europe/Copenhagen" }) : "")
@@ -44,25 +44,45 @@ export default function QuoteDocument({ quote, org }: { quote: Quote; org: Org }
       <h1 className="quote-doc-title">{quote.title || "Tilbud"}</h1>
       {quote.intro && <p className="quote-doc-intro">{quote.intro}</p>}
 
-      <table className="quote-doc-table">
-        <thead><tr><th>Beskrivelse</th><th className="num">Antal</th><th className="num">Pris</th><th className="num">Beløb</th></tr></thead>
-        <tbody>
-          {quote.lines.map((l, i) => (
-            <tr key={l.id ?? i}>
-              <td className="whitespace-pre-line">{l.description}</td>
-              <td className="num">{l.quantity.toLocaleString("da-DK")} {l.unit}</td>
-              <td className="num">{kr(l.unit_price)}</td>
-              <td className="num">{kr(l.quantity * l.unit_price)}</td>
-            </tr>
-          ))}
-        </tbody>
-        <tfoot>
-          <tr><td colSpan={3}>Subtotal ekskl. moms</td><td className="num">{kr(subtotal)}</td></tr>
-          <tr><td colSpan={3}>Moms {quote.vat_rate}%</td><td className="num">{kr(vat)}</td></tr>
-          <tr className="quote-doc-total"><td colSpan={3}>Total inkl. moms{period}</td><td className="num">{kr(total)}</td></tr>
-        </tfoot>
-      </table>
-      <p className="quote-doc-billing">{billingLabel(quote.billing)} · {kr(subtotal)} ekskl. moms{period}</p>
+      {(() => {
+        const split = splitTotals(quote.lines, quote.vat_rate, quote.billing)
+        const table = (lines: QuoteLine[], t: ReturnType<typeof totals>, label: string, suffix: string) => (
+          <table className="quote-doc-table">
+            <thead><tr><th>{label}</th><th className="num">Antal</th><th className="num">Pris</th><th className="num">Beløb</th></tr></thead>
+            <tbody>
+              {lines.map((l, i) => (
+                <tr key={l.id ?? i}>
+                  <td className="whitespace-pre-line">{l.description}</td>
+                  <td className="num">{l.quantity.toLocaleString("da-DK")} {l.unit}</td>
+                  <td className="num">{kr(l.unit_price)}</td>
+                  <td className="num">{kr(l.quantity * l.unit_price)}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr><td colSpan={3}>Subtotal ekskl. moms</td><td className="num">{kr(t.subtotal)}</td></tr>
+              <tr><td colSpan={3}>Moms {quote.vat_rate}%</td><td className="num">{kr(t.vat)}</td></tr>
+              <tr className="quote-doc-total"><td colSpan={3}>Total inkl. moms{suffix}</td><td className="num">{kr(t.total)}</td></tr>
+            </tfoot>
+          </table>
+        )
+        if (split.mixed) {
+          return (
+            <>
+              {table(split.monthlyLines, split.monthly, "Fast aftale", " pr. måned")}
+              <div style={{ height: 18 }} />
+              {table(split.oneOffLines, split.oneOff, "Engangsopgaver", "")}
+              <p className="quote-doc-billing">Fast aftale {kr(split.monthly.subtotal)} ekskl. moms pr. måned · engangsopgaver {kr(split.oneOff.subtotal)} ekskl. moms</p>
+            </>
+          )
+        }
+        return (
+          <>
+            {table(quote.lines, { subtotal, vat, total }, "Beskrivelse", period)}
+            <p className="quote-doc-billing">{billingLabel(quote.billing)} · {kr(subtotal)} ekskl. moms{period}</p>
+          </>
+        )
+      })()}
 
       {quote.terms && (
         <section className="quote-doc-terms">

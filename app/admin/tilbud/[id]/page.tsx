@@ -2,7 +2,7 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ArrowLeft, Copy, ExternalLink, Plus, Save, Send, Trash2 } from "lucide-react"
 import { requireRolePage } from "@/lib/auth-guard"
-import { kr, loadQuote, statusLabels, totals } from "@/lib/backend/quotes"
+import { kr, loadQuote, splitTotals, statusLabels, totals } from "@/lib/backend/quotes"
 import QuoteDocument from "@/components/quote-document"
 import BannerSelect from "@/components/banner-select"
 import { loadBanners, loadMailSettings } from "@/lib/backend/mail-settings"
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic"
 
 const units = ["md.", "stk", "time", "gang", "m²", "uge"]
 
-export default async function QuoteEditor({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ gemt?: string; sendt?: string; fejl?: string; linjer?: string }> }) {
+export default async function QuoteEditor({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ gemt?: string; sendt?: string; fejl?: string; linjer?: string; klar?: string }> }) {
   const { id } = await params
   const { org } = await requireRolePage(["admin"], `/admin/tilbud/${id}`)
   const sp = await searchParams
@@ -45,6 +45,7 @@ export default async function QuoteEditor({ params, searchParams }: { params: Pr
         </div>
 
         {sp.gemt && <p className="admin-notice is-ok" role="status">Tilbuddet er gemt.</p>}
+        {sp.klar && <p className="admin-notice is-ok" role="status">Tilbuddet er beregnet. Tjek kundens email, og tryk “Gem og send tilbud” nederst.</p>}
         {sp.sendt && <p className="admin-notice is-ok" role="status">Tilbuddet er sendt til {quote.recipient_email}. Du kan se her, når kunden har åbnet det.</p>}
         {sp.fejl && <p className="admin-notice is-error" role="alert">{sp.fejl}</p>}
 
@@ -76,6 +77,7 @@ export default async function QuoteEditor({ params, searchParams }: { params: Pr
               <div className="admin-quote-line admin-quote-line-head" aria-hidden="true"><span>Beskrivelse</span><span>Antal</span><span>Enhed</span><span>Pris ekskl. moms</span></div>
               {rows.map((l, i) => (
                 <div className="admin-quote-line" key={i}>
+                  <input type="hidden" name="line_recurring" value={"recurring" in l && l.recurring !== null && l.recurring !== undefined ? String(l.recurring) : ""} />
                   <textarea name="line_description" rows={2} defaultValue={l.description} aria-label={`Linje ${i + 1} beskrivelse`} placeholder={i === 0 ? "Fx Daglig rengøring af kontor (250 m²), mandag–fredag" : "Ny linje"} />
                   <input name="line_quantity" type="number" step="0.01" min={0} defaultValue={l.quantity} aria-label="Antal" />
                   <select name="line_unit" defaultValue={units.includes(l.unit) ? l.unit : "stk"} aria-label="Enhed">{units.map((u) => <option key={u}>{u}</option>)}</select>
@@ -84,6 +86,7 @@ export default async function QuoteEditor({ params, searchParams }: { params: Pr
               ))}
               <button type="submit" name="intent" value="add_line" className="admin-add-line"><Plus className="size-4" /> Flere linjer</button>
             </div>
+            {splitTotals(quote.lines, quote.vat_rate, quote.billing).mixed && <p className="admin-form-hint">Tilbuddet har både fast aftale og engangsopgaver. Se fordelingen i forhåndsvisningen.</p>}
             <dl className="admin-quote-totals">
               <div><dt>Subtotal</dt><dd>{kr(subtotal)}</dd></div>
               <div><dt>Moms</dt><dd>{kr(vat)}</dd></div>
@@ -97,7 +100,7 @@ export default async function QuoteEditor({ params, searchParams }: { params: Pr
 
             <div className="admin-form-actions"><button type="submit" className="admin-primary"><Save className="size-4" /> Gem</button></div>
 
-            <h2>Send til kunden</h2>
+            <h2 id="send">Send til kunden</h2>
             <label>Besked i mailen (valgfri – ellers bruges en standardtekst)<textarea name="message" rows={4} placeholder={`Hej ${(quote.recipient_name ?? "").split(" ")[0]}\n\nTak for en god dialog. Hermed vores tilbud…`} /></label>
             <BannerSelect banners={banners} defaultId={settings.default_banner_id ?? "none"} />
             <div className="admin-form-actions">
