@@ -1,6 +1,8 @@
 import { createAdminClient } from "@/lib/supabase/admin"
 import { customerPortal } from "@/lib/portal"
 import PasswordForm from "@/components/password-form"
+import ThemePicker from "@/components/theme-picker"
+import { cookies } from "next/headers"
 import { saveProfile } from "@/app/medarbejder/profil/actions"
 
 export const dynamic = "force-dynamic"
@@ -28,6 +30,7 @@ export default async function CustomerProfile({ searchParams }: { searchParams: 
         </form>
         <section className="pt-card"><h2>Adgangskode</h2><PasswordForm disabled={Boolean(p.preview)} /></section>
       </div>
+      <section className="pt-card"><h2>Udseende</h2><ThemePicker current={(await cookies()).get("sm_theme")?.value ?? "auto"} /></section>
       <div className="pt-pairs">
         <section className="pt-card">
           <h2>Kundeoplysninger</h2>

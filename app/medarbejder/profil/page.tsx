@@ -1,5 +1,7 @@
 import { employeePortal } from "@/lib/portal"
 import PasswordForm from "@/components/password-form"
+import ThemePicker from "@/components/theme-picker"
+import { cookies } from "next/headers"
 import { saveProfile } from "./actions"
 
 export const dynamic = "force-dynamic"
@@ -23,6 +25,7 @@ export default async function EmployeeProfile({ searchParams }: { searchParams: 
         </form>
         <section className="pt-card"><h2>Adgangskode</h2><PasswordForm disabled={Boolean(p.preview)} /></section>
       </div>
+      <section className="pt-card"><h2>Udseende</h2><ThemePicker current={(await cookies()).get("sm_theme")?.value ?? "auto"} /></section>
       <section className="pt-card">
         <h2>Kontor</h2>
         <ul className="pt-mini">

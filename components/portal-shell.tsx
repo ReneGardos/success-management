@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { cookies } from "next/headers"
 import type { Org } from "@/lib/org"
 import type { ViewAs } from "@/lib/view-as"
 import ViewAsBanner from "@/components/view-as-banner"
@@ -7,12 +8,14 @@ import { vapidPublicKey } from "@/lib/backend/push"
 import PortalNav, { type NavItem } from "@/components/portal-nav"
 
 /** Branded frame for the employee and customer areas. */
-export default function PortalShell({ org, title, subtitle, items, root, preview, canSwitch, children }: {
+export default async function PortalShell({ org, title, subtitle, items, root, preview, canSwitch, children }: {
   org: Org; title: string; subtitle: string; items: NavItem[]; root: string; preview: ViewAs | null; canSwitch: boolean; children: React.ReactNode
 }) {
   const logo = org.logo_url || org.email_logo_url
+  const theme = (await cookies()).get("sm_theme")?.value
+  const themeClass = theme === "dark" ? " pt-theme-dark" : theme === "light" ? " pt-theme-light" : ""
   return (
-    <div className={`pt${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent, ["--pt-bg" as string]: org.color_background }}>
+    <div className={`pt${themeClass}${preview ? " viewas-readonly" : ""}`} style={{ ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent, ["--pt-bg" as string]: org.color_background }}>
       {preview && <ViewAsBanner viewAs={preview} />}
       <header className="pt-top">
         <Link href={root} className="pt-brand">

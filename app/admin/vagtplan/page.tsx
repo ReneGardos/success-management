@@ -58,6 +58,7 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
   const absentOn = (emp: string, day: string) => (absences ?? []).some((a) => a.status === "approved" && a.employee_id === emp && a.starts_on <= day && a.ends_on >= day)
   const conflicts = shifts.filter((s) => s.scheduled_start && s.status !== "cancelled" && s.employeeIds.some((e) => absentOn(e, dayKey(s.scheduled_start!))))
   const pendingAbs = (absences ?? []).filter((a) => a.status === "pending").length
+  const { data: offers } = await createAdminClient().from("shift_handovers").select("job_id, employee_id").eq("org_id", org.id).eq("status", "open")
 
   const byDay: Record<string, CalendarShift[]> = {}
   for (const s of shifts) {
@@ -146,6 +147,7 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
             {pendingAbs > 0 && <> · <Link href="/admin/fravaer">{pendingAbs} ansøgning{pendingAbs === 1 ? "" : "er"} venter</Link></>}
           </p>
         )}
+        {(offers?.length ?? 0) > 0 && <p className="admin-notice">🔄 {offers!.length} vagt{offers!.length === 1 ? "" : "er"} er sat til overtagelse af medarbejdere: {offers!.slice(0, 4).map((o, i) => { const s = shifts.find((x) => x.id === o.job_id); return <span key={o.job_id}>{i ? ", " : ""}<Link href={`${base}&vagt=${o.job_id}`}>{(names.get(o.employee_id) ?? "?").split(" ")[0]}{s?.scheduled_start ? ` ${new Date(s.scheduled_start).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", day: "numeric", month: "short" })}` : ""}</Link></span> })}</p>}
         {conflicts.length > 0 && <p className="admin-notice is-error" role="alert">{conflicts.length} vagt{conflicts.length === 1 ? "" : "er"} har en medarbejder med godkendt fravær: {conflicts.slice(0, 4).map((s, i) => <span key={s.id}>{i ? ", " : ""}<Link href={`${base}&vagt=${s.id}`}>{shiftName(s)} {new Date(s.scheduled_start!).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", day: "numeric", month: "short" })}</Link></span>)}{conflicts.length > 4 ? " …" : ""}</p>}
         {!locations.length && <p className="admin-notice">Tip: <Link href="/admin/steder">Opret jeres steder</Link>, så medarbejderne kan tjekke ind med GPS.</p>}
 

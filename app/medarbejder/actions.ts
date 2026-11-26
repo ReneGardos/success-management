@@ -117,3 +117,51 @@ export async function qrCheckIn(token: string, jobId: string) {
   refresh()
   return { ok: true, message: "Tjekket ind med QR." }
 }
+
+/** Offer one of my shifts to colleagues. I stay on it until someone takes it. */
+export async function offerShift(jobId: string, reason: string) {
+  const { user, org, ctx } = await requireRoleAction(["employee", "admin"])
+  const { getViewAs } = await import("@/lib/view-as")
+  if (await getViewAs(ctx)) return { ok: false, message: "Visning er skrivebeskyttet." }
+  try { await assertAssigned(org.id, jobId, user.id) } catch { return { ok: false, message: "Vagten er ikke din." } }
+  const db = createAdminClient()
+  const { data: job } = await db.from("jobs").select("scheduled_start, status").eq("org_id", org.id).eq("id", jobId).maybeSingle()
+  if (!job?.scheduled_start || new Date(job.scheduled_start).getTime() < Date.now() || job.status !== "scheduled") return { ok: false, message: "Vagten kan ikke afgives." }
+  const { error } = await db.from("shift_handovers").insert({ org_id: org.id, job_id: jobId, employee_id: user.id, reason: reason.trim().slice(0, 300) || null })
+  if (error) return { ok: false, message: "Vagten er allerede sat til overtagelse." }
+  const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+  const when = new Date(job.scheduled_start).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+  const { data: staff } = await db.from("memberships").select("user_id").eq("org_id", org.id).eq("role", "employee").neq("user_id", user.id)
+  await notifyUsers(org, (staff ?? []).map((s) => String(s.user_id)), { kind: "shift", title: "Vagt til overtagelse", body: `${me?.full_name?.split(" ")[0] ?? "En kollega"} kan ikke ${when}. Kan du?`, href: "/medarbejder/vagter?vis=ledige" })
+  await notifyAdmins(org, { kind: "shift", title: "Vagt sat til overtagelse", body: `${me?.full_name ?? "En medarbejder"} · ${when}${reason ? ` · ${reason}` : ""}`, href: `/admin/vagtplan?vagt=${jobId}` }, user.id)
+  refresh()
+  return { ok: true, message: "Vagten er sat til overtagelse. Du bliver på den, indtil en kollega tager den." }
+}
+
+export async function withdrawOffer(handoverId: string) {
+  const { user, org } = await requireRoleAction(["employee", "admin"])
+  await createAdminClient().from("shift_handovers").update({ status: "withdrawn" }).eq("org_id", org.id).eq("id", handoverId).eq("employee_id", user.id).eq("status", "open")
+  refresh()
+  return { ok: true, message: "Du beholder vagten." }
+}
+
+/** A colleague takes over an offered shift: the swap happens right away. */
+export async function takeOverShift(handoverId: string) {
+  const { user, org, ctx } = await requireRoleAction(["employee", "admin"])
+  const { getViewAs } = await import("@/lib/view-as")
+  if (await getViewAs(ctx)) return { ok: false, message: "Visning er skrivebeskyttet." }
+  const db = createAdminClient()
+  const { data: h } = await db.from("shift_handovers").select("id, job_id, employee_id, status").eq("org_id", org.id).eq("id", handoverId).maybeSingle()
+  if (!h || h.status !== "open") return { ok: false, message: "Vagten er allerede taget." }
+  if (h.employee_id === user.id) return { ok: false, message: "Det er din egen vagt." }
+  const { data: claimed } = await db.from("shift_handovers").update({ status: "taken", taken_by: user.id, taken_at: new Date().toISOString() }).eq("id", h.id).eq("status", "open").select("id").maybeSingle()
+  if (!claimed) return { ok: false, message: "Vagten blev lige taget af en anden." }
+  await db.from("job_assignments").delete().eq("org_id", org.id).eq("job_id", h.job_id).eq("employee_id", h.employee_id)
+  await db.from("job_assignments").upsert({ org_id: org.id, job_id: h.job_id, employee_id: user.id }, { onConflict: "job_id,employee_id" })
+  const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+  const name = me?.full_name ?? "En kollega"
+  await notifyUsers(org, [h.employee_id], { kind: "shift", title: "Din vagt er overtaget", body: `${name} har taget vagten. Tak!`, href: "/medarbejder/vagter" })
+  await notifyAdmins(org, { kind: "shift", title: "Vagt overtaget", body: `${name} har overtaget en vagt.`, href: `/admin/vagtplan?vagt=${h.job_id}` }, user.id)
+  refresh()
+  return { ok: true, message: "Vagten er din nu." }
+}
