@@ -162,3 +162,19 @@ export async function sendTestMail(formData: FormData) {
   }
   done(`test=${encodeURIComponent(user.email!)}`)
 }
+
+/** Stripe keys for online invoice payment. Keys are write-only: never sent back to the browser. */
+export async function savePaymentSettings(formData: FormData) {
+  const { org } = await requireRoleAction(["admin"])
+  const db = createAdminClient()
+  const secret = String(formData.get("stripe_secret_key") ?? "").trim()
+  const hook = String(formData.get("stripe_webhook_secret") ?? "").trim()
+  const enabled = formData.get("enabled") === "on"
+  if (secret && !/^(sk|rk)_(live|test)_[A-Za-z0-9]{10,}$/.test(secret)) redirect(`/admin/indstillinger?fejl=${encodeURIComponent("Stripe-nøglen ser forkert ud (skal starte med sk_live_ eller sk_test_).")}#betaling`)
+  if (hook && !/^whsec_[A-Za-z0-9]{10,}$/.test(hook)) redirect(`/admin/indstillinger?fejl=${encodeURIComponent("Webhook-hemmeligheden skal starte med whsec_.")}#betaling`)
+  const { data: current } = await db.from("org_payment_settings").select("stripe_secret_key").eq("org_id", org.id).maybeSingle()
+  if (enabled && !secret && !current?.stripe_secret_key) redirect(`/admin/indstillinger?fejl=${encodeURIComponent("Indsæt Stripe-nøglen først.")}#betaling`)
+  await db.from("org_payment_settings").upsert({ org_id: org.id, enabled, updated_at: new Date().toISOString(), ...(secret ? { stripe_secret_key: secret } : {}), ...(hook ? { stripe_webhook_secret: hook } : {}) }, { onConflict: "org_id" })
+  revalidatePath("/admin/indstillinger")
+  redirect("/admin/indstillinger?gemt=1#betaling")
+}

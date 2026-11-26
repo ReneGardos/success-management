@@ -4,12 +4,13 @@ import { loadReportByToken } from "@/lib/backend/reports"
 import { loadOrgById } from "@/lib/org"
 import ReportView from "@/components/report-view"
 import PhotoUpload from "@/components/photo-upload"
-import { feedbackUploadTarget, registerFeedbackPhoto, submitReportFeedback } from "./actions"
+import StarRating from "@/components/star-rating"
+import { feedbackUploadTarget, rateReport, registerFeedbackPhoto, submitReportFeedback } from "./actions"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Rengøringsrapport", robots: { index: false, follow: false } }
 
-export default async function PublicReport({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ tak?: string; fejl?: string }> }) {
+export default async function PublicReport({ params, searchParams }: { params: Promise<{ token: string }>; searchParams: Promise<{ tak?: string; fejl?: string; bedomt?: string }> }) {
   const { token } = await params
   const sp = await searchParams
   const report = await loadReportByToken(token)
@@ -29,6 +30,16 @@ export default async function PublicReport({ params, searchParams }: { params: P
     <main className="rv-page" style={{ background: org.color_background, ["--primary" as string]: org.color_primary, ["--accent" as string]: org.color_accent }}>
       <div className="rv-brand">{logo ? <img src={logo} alt={org.name} /> : <strong>{org.name}</strong>}</div>
       <ReportView report={report} title={title} date={job?.scheduled_start ?? report.created_at} checkIn={entry?.check_in_at ?? null} checkOut={entry?.check_out_at ?? null} employee={emp?.full_name ?? null} />
+      <section className="rv-feedback" id="bedom">
+        <h2>{report.customer_rating ? "Tak for jeres bedømmelse" : "Hvordan gik besøget?"}</h2>
+        {sp.bedomt && <p className="field-ok" role="status">Tak! Jeres bedømmelse er gemt.</p>}
+        {sp.fejl === "3" && <p className="field-err" role="alert">Vælg 1–5 stjerner.</p>}
+        <form action={rateReport.bind(null, token)} className="rv-form">
+          <StarRating initial={report.customer_rating ?? 0} />
+          <textarea name="comment" rows={2} maxLength={1000} placeholder="Kommentar (valgfri)" defaultValue={report.customer_comment ?? ""} />
+          <button type="submit" className="field-btn field-btn-primary">{report.customer_rating ? "Opdatér bedømmelse" : "Send bedømmelse"}</button>
+        </form>
+      </section>
       <section className="rv-feedback" id="feedback">
         <h2>Er der noget, vi kan gøre bedre?</h2>
         <p>Skriv til os, og tilføj gerne et billede, så vi kan se, hvad det drejer sig om.</p>

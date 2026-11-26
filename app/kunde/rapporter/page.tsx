@@ -1,4 +1,4 @@
-import { Check, MapPin } from "lucide-react"
+import { Check, MapPin, Star } from "lucide-react"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { customerPortal } from "@/lib/portal"
 
@@ -11,7 +11,7 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
   const db = createAdminClient()
   const filter = sp.sted && p.locIds.includes(sp.sted) ? [sp.sted] : p.locIds
   const { data: reports } = filter.length
-    ? await db.from("cleaning_reports").select("id, public_token, created_at, location_id, checked_in_at, checked_out_at, job:jobs(scheduled_start)").eq("org_id", p.org.id).in("location_id", filter).eq("status", "submitted").eq("customer_visible", true).order("created_at", { ascending: false }).limit(60)
+    ? await db.from("cleaning_reports").select("id, public_token, created_at, location_id, customer_rating, job:jobs(scheduled_start)").eq("org_id", p.org.id).in("location_id", filter).eq("status", "submitted").eq("customer_visible", true).order("created_at", { ascending: false }).limit(60)
     : { data: [] }
   const rIds = (reports ?? []).map((r) => r.id)
   const [{ data: items }, { data: photos }] = rIds.length
@@ -26,6 +26,9 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
   for (const ph of photos ?? []) if (ph.report_id) pics.set(ph.report_id, (pics.get(ph.report_id) ?? 0) + 1)
   const locName = new Map(p.locations.map((l) => [l.id, l.name]))
   const all = [...score.values()].reduce((a, [d, t]) => [a[0] + d, a[1] + t], [0, 0])
+  const rated = (reports ?? []).filter((r) => r.customer_rating)
+  const avg = rated.length ? rated.reduce((s, r) => s + Number(r.customer_rating), 0) / rated.length : 0
+  const unrated = (reports ?? []).filter((r) => !r.customer_rating).length
 
   return (
     <main className="pt-page">
@@ -39,6 +42,8 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
       <div className="pt-kpis">
         <div><small>Rapporter</small><strong>{reports?.length ?? 0}</strong><em>seneste 60</em></div>
         <div><small>Opgaver udført</small><strong>{all[1] ? `${Math.round((all[0] / all[1]) * 100)}%` : "–"}</strong><em>{all[0]} af {all[1]}</em></div>
+        <div><small>Jeres bedømmelse</small><strong>{avg ? `${avg.toFixed(1).replace(".", ",")} ★` : "–"}</strong><em>{rated.length} bedømt</em></div>
+        <div><small>Mangler bedømmelse</small><strong>{unrated}</strong><em>tryk på et besøg</em></div>
       </div>
       <section className="pt-card">
         <ul className="pt-mini">
@@ -52,7 +57,7 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
                   <strong>{new Date(when).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "long", day: "numeric", month: "long" })}</strong>
                   <small><MapPin className="size-3 inline" /> {locName.get(String(r.location_id)) ?? ""}{n ? ` · ${n} billede${n === 1 ? "" : "r"}` : ""}</small>
                 </a>
-                <b className={d === t ? "is-ok" : "is-warn"}><Check className="size-4 inline" /> {d}/{t}</b>
+                <b>{r.customer_rating ? <span className="rv-stars" aria-label={`${r.customer_rating} stjerner`}>{[1, 2, 3, 4, 5].map((n) => <Star key={n} className={`size-3${n <= Number(r.customer_rating) ? " is-on" : ""}`} />)}</span> : <a href={`/r/${r.public_token}#bedom`} className="pt-link">Bedøm</a>}<span className={d === t ? "is-ok" : "is-warn"}><Check className="size-4 inline" /> {d}/{t}</span></b>
               </li>
             )
           })}

@@ -22,6 +22,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
       canSwitch={p.ctx.memberships.length > 1}
       items={[
         { href: "/kunde", label: "Oversigt", icon: "home" },
+        { href: "/kunde/besoeg", label: "Besøg", icon: "calendar" },
         { href: "/kunde/beskeder", label: "Beskeder", icon: "chat", badge: unread },
         { href: "/kunde/rapporter", label: "Rapporter", icon: "report" },
         { href: "/kunde/fakturaer", label: "Fakturaer", icon: "invoice", badge: unpaid ?? 0 },

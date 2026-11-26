@@ -2,7 +2,9 @@ import { ImagePlus, Send, Trash2 } from "lucide-react"
 import { requireRolePage } from "@/lib/auth-guard"
 import { loadBanners, loadMailSettings } from "@/lib/backend/mail-settings"
 import { renderHtml, senderFor } from "@/lib/backend/mail"
-import { addBanner, deleteBanner, saveMailSettings, saveOrganization, sendTestMail, toggleBanner } from "./actions"
+import { addBanner, deleteBanner, saveMailSettings, saveOrganization, savePaymentSettings, sendTestMail, toggleBanner } from "./actions"
+import { createAdminClient } from "@/lib/supabase/admin"
+import { appUrl } from "@/lib/org"
 import { defaultIntro, defaultTerms } from "@/lib/backend/quotes"
 import { orgSender } from "@/lib/org"
 
@@ -11,7 +13,8 @@ export const dynamic = "force-dynamic"
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ gemt?: string; banner?: string; test?: string; fejl?: string; virksomhed?: string }> }) {
   const { user, org } = await requireRolePage(["admin"], "/admin/indstillinger")
   const sp = await searchParams
-  const [{ settings, stored }, banners, me] = await Promise.all([loadMailSettings(org), loadBanners(org.id, true), senderFor(org, user.id, user.email ?? null)])
+  const [{ settings, stored }, banners, me, { data: pay }] = await Promise.all([loadMailSettings(org), loadBanners(org.id, true), senderFor(org, user.id, user.email ?? null), createAdminClient().from("org_payment_settings").select("enabled, stripe_secret_key, stripe_webhook_secret").eq("org_id", org.id).maybeSingle()])
+  const keyHint = pay?.stripe_secret_key ? `${pay.stripe_secret_key.slice(0, 8)}…${pay.stripe_secret_key.slice(-4)}` : null
   const defaultBanner = banners.find((b) => b.id === settings.default_banner_id) ?? null
   const preview = renderHtml(org, `Hej Maria\n\nTak for en god snak i dag. Hermed et par linjer, så du kan se, hvordan vores mails ser ud for kunderne.`, me, "", { settings, banner: settings.default_banner_id === "none" ? null : defaultBanner })
 
@@ -145,6 +148,18 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
                 ))}
               </div>
             </section>
+
+            <form action={savePaymentSettings} className="admin-form" id="betaling">
+              <h2>Online betaling af fakturaer</h2>
+              <p className="admin-muted">Kunderne får en "Betal online"-knap på fakturaen (kort, MobilePay, Apple/Google Pay – det I har slået til i Stripe). Fakturaen markeres automatisk som betalt.</p>
+              <div className="admin-form-grid">
+                <label>Stripe secret key<input name="stripe_secret_key" type="password" autoComplete="off" placeholder={keyHint ? `Gemt: ${keyHint} – udfyld kun for at skifte` : "sk_live_…"} /></label>
+                <label>Webhook-hemmelighed (valgfri)<input name="stripe_webhook_secret" type="password" autoComplete="off" placeholder={pay?.stripe_webhook_secret ? "Gemt – udfyld kun for at skifte" : "whsec_…"} /></label>
+                <label className="span-2">Webhook-adresse i Stripe (event: checkout.session.completed)<input readOnly value={`${appUrl()}/api/stripe/${org.id}`} /></label>
+                <label className="admin-check span-2"><input type="checkbox" name="enabled" defaultChecked={Boolean(pay?.enabled)} /> Slå online betaling til</label>
+                <div className="admin-form-actions"><button type="submit" className="admin-primary">Gem betaling</button></div>
+              </div>
+            </form>
 
             <form action={sendTestMail} className="admin-form">
               <h2>Test</h2>

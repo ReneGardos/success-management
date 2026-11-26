@@ -83,3 +83,27 @@ export async function orderExtra(formData: FormData) {
   await notifyAdmins(org, { kind: "order", title: `Bestilling fra ${cust?.company || name}`, body: message.split("\n").slice(1).join(" · ").slice(0, 160), href: `/admin/mail/${requestId}` })
   redirect("/kunde/bestil?sendt=1")
 }
+
+/** Customer asks to move or skip one planned visit. The office decides. */
+export async function requestVisitChange(formData: FormData) {
+  const { org, user, ctx } = await requireRoleAction(["customer", "admin"])
+  if (await getViewAs(ctx)) redirect("/kunde/besoeg")
+  const db = createAdminClient()
+  const jobId = String(formData.get("job_id") ?? "")
+  const kind = String(formData.get("kind") ?? "") === "skip" ? "skip" : "move"
+  const wish = String(formData.get("wish_date") ?? "").slice(0, 10)
+  const wishTime = String(formData.get("wish_time") ?? "").slice(0, 5)
+  const note = String(formData.get("note") ?? "").trim().slice(0, 500) || null
+  if (!/^[0-9a-f-]{36}$/i.test(jobId)) redirect("/kunde/besoeg")
+  const customers = await customerIdsFor(org.id, user.id, user.email)
+  const { data: job } = await db.from("jobs").select("id, scheduled_start, status, location:locations(name, customer_id)").eq("org_id", org.id).eq("id", jobId).maybeSingle()
+  const loc = job?.location as unknown as { name: string; customer_id: string | null } | null
+  if (!job || !loc?.customer_id || !customers.includes(String(loc.customer_id)) || job.status === "cancelled") redirect("/kunde/besoeg")
+  if (kind === "move" && !/^\d{4}-\d{2}-\d{2}$/.test(wish)) redirect(`/kunde/besoeg?fejl=${encodeURIComponent("Vælg en ønsket dato for flytningen.")}`)
+  const { data: open } = await db.from("visit_requests").select("id").eq("org_id", org.id).eq("job_id", jobId).eq("status", "pending").maybeSingle()
+  if (open) redirect("/kunde/besoeg?sendt=1")
+  await db.from("visit_requests").insert({ org_id: org.id, job_id: jobId, customer_id: loc.customer_id, requested_by: user.id, kind, wish_date: kind === "move" ? wish : null, wish_time: kind === "move" && /^\d{2}:\d{2}$/.test(wishTime) ? wishTime : null, note })
+  const when = job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short" }) : ""
+  await notifyAdmins(org, { kind: "shift", title: kind === "skip" ? `Kunde vil springe besøg over (${loc.name})` : `Kunde vil flytte besøg (${loc.name})`, body: kind === "skip" ? `${when}${note ? ` · ${note}` : ""}` : `${when} → ${wish}${wishTime ? ` kl. ${wishTime}` : ""}${note ? ` · ${note}` : ""}`, href: "/admin/besoeg" })
+  redirect("/kunde/besoeg?sendt=1")
+}

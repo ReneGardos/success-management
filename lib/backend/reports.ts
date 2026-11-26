@@ -4,7 +4,7 @@ import { createAdminClient } from "@/lib/supabase/admin"
 export type ReportItem = { id: string; task_id: string | null; label: string; area: string | null; done: boolean; note: string | null; position: number }
 export type Product = { id: string; name: string; unit: string }
 export type ReportProduct = { product_id: string; status: "ok" | "low" | "missing"; qty_taken: number }
-export type Photo = { id: string; kind: string; caption: string | null; path: string; url: string | null; created_at: string; uploaded_by: string | null }
+export type Photo = { id: string; kind: string; caption: string | null; path: string; url: string | null; created_at: string; uploaded_by: string | null; item_id: string | null }
 export type Report = {
   id: string
   org_id: string
@@ -18,6 +18,13 @@ export type Report = {
   public_token: string
   submitted_at: string | null
   created_at: string
+  customer_rating: number | null
+  customer_comment: string | null
+  rated_at: string | null
+  signature_path: string | null
+  signed_name: string | null
+  signed_at: string | null
+  signatureUrl?: string | null
   items: ReportItem[]
   products: ReportProduct[]
   photos: Photo[]
@@ -25,7 +32,7 @@ export type Report = {
 
 export const BUCKET = "org-photos"
 export const productStatusLabels = { ok: "Nok", low: "Snart tom", missing: "Mangler" } as const
-export const photoKindLabels: Record<string, string> = { issue: "Problem", unusual: "Ud over det sædvanlige", before: "Før", after: "Efter", customer: "Fra kunden" }
+export const photoKindLabels: Record<string, string> = { issue: "Problem", unusual: "Ud over det sædvanlige", before: "Før", after: "Efter", customer: "Fra kunden", chat: "Chat", signature: "Underskrift" }
 
 /** First line of a quote line description, used as a checklist label. */
 const taskLabel = (description: string) => description.split("\n")[0].replace(/\s*\([^)]*\)\s*$/, "").trim()
@@ -102,11 +109,12 @@ async function withDetails(r: Report): Promise<Report> {
   const [{ data: items }, { data: products }, { data: photos }] = await Promise.all([
     db.from("cleaning_report_items").select("id, task_id, label, area, done, note, position").eq("org_id", r.org_id).eq("report_id", r.id).order("position"),
     db.from("report_products").select("product_id, status, qty_taken").eq("org_id", r.org_id).eq("report_id", r.id),
-    db.from("photos").select("id, kind, caption, path, created_at, uploaded_by").eq("org_id", r.org_id).eq("report_id", r.id).order("created_at"),
+    db.from("photos").select("id, kind, caption, path, created_at, uploaded_by, item_id").eq("org_id", r.org_id).eq("report_id", r.id).order("created_at"),
   ])
-  const urls = await signedUrls((photos ?? []).map((p) => String(p.path)))
+  const urls = await signedUrls([...(photos ?? []).map((p) => String(p.path)), ...(r.signature_path ? [r.signature_path] : [])])
   return {
     ...r,
+    signatureUrl: r.signature_path ? urls.get(r.signature_path) ?? null : null,
     items: (items ?? []) as ReportItem[],
     products: (products ?? []).map((p) => ({ ...p, qty_taken: Number(p.qty_taken) })) as ReportProduct[],
     photos: (photos ?? []).map((p) => ({ ...p, url: urls.get(String(p.path)) ?? null })) as Photo[],

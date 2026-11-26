@@ -123,3 +123,35 @@ export async function requestSupply(formData: FormData) {
   revalidatePath("/admin/forsyning")
   redirect("/medarbejder?mangler=sendt")
 }
+
+/** Before/after photo attached to one checklist item. */
+export async function registerItemPhoto(reportId: string, itemId: string, path: string, kind: string, caption: string) {
+  const { org, user, ctx } = await requireRoleAction(["employee", "admin"])
+  if (await getViewAs(ctx)) return { ok: false, message: "Visning er skrivebeskyttet." }
+  const report = await ownReport(org.id, reportId, user.id)
+  if (!pathAllowed(org.id, `reports/${reportId}`, path)) return { ok: false, message: "Ugyldigt billede." }
+  const db = createAdminClient()
+  const { data: item } = await db.from("cleaning_report_items").select("id").eq("org_id", org.id).eq("report_id", reportId).eq("id", itemId).maybeSingle()
+  if (!item) return { ok: false, message: "Opgaven findes ikke." }
+  const { error } = await db.from("photos").insert({ org_id: org.id, report_id: reportId, location_id: report.location_id, item_id: itemId, uploaded_by: user.id, kind: kind === "after" ? "after" : "before", path, caption: caption.trim().slice(0, 200) || null })
+  revalidatePath(`/medarbejder/rapport/${report.job_id}`)
+  return { ok: !error, message: error?.message }
+}
+
+export async function signatureUploadTarget(reportId: string) {
+  const { org, user, ctx } = await requireRoleAction(["employee", "admin"])
+  if (await getViewAs(ctx)) throw new Error("Visning er skrivebeskyttet.")
+  await ownReport(org.id, reportId, user.id)
+  return photoUploadTarget(org.id, `reports/${reportId}`, "image/png")
+}
+
+/** Customer signs on the employee's phone/iPad to confirm the visit. */
+export async function registerSignature(reportId: string, path: string, name: string) {
+  const { org, user, ctx } = await requireRoleAction(["employee", "admin"])
+  if (await getViewAs(ctx)) return { ok: false, message: "Visning er skrivebeskyttet." }
+  const report = await ownReport(org.id, reportId, user.id)
+  if (!pathAllowed(org.id, `reports/${reportId}`, path) || !path.endsWith(".png")) return { ok: false, message: "Ugyldig underskrift." }
+  const { error } = await createAdminClient().from("cleaning_reports").update({ signature_path: path, signed_name: name.trim().slice(0, 120) || null, signed_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", reportId)
+  revalidatePath(`/medarbejder/rapport/${report.job_id}`)
+  return { ok: !error, message: error?.message }
+}
