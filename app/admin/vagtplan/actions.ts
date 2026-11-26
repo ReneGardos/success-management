@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireRoleAction } from "@/lib/auth-guard"
+import { notifyUsers } from "@/lib/backend/notify"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { addDays, copenhagenToIso } from "@/lib/time"
 import { expandDates, MAX_OCCURRENCES, repeatOptions, type RepeatRule } from "@/lib/recurrence"
@@ -86,6 +87,7 @@ export async function createShifts(formData: FormData) {
   if (employees.length) {
     const { error: assignError } = await db.from("job_assignments").insert(created!.flatMap((job) => employees.map((employee_id) => ({ org_id: org.id, job_id: job.id, employee_id }))))
     if (assignError) fail(`Vagterne er oprettet, men tildeling fejlede: ${assignError.message}`)
+    await notifyUsers(org, employees, { kind: "shift", title: created!.length === 1 ? "Du har fået en ny vagt" : `Du har fået ${created!.length} nye vagter`, body: "Se dine vagter i appen.", href: "/medarbejder/vagter" })
   }
   refresh()
   redirect(`${back}${back.includes("?") ? "&" : "?"}oprettet=${created!.length}`)
@@ -124,8 +126,14 @@ export async function updateShift(formData: FormData) {
   const { data: updated, error } = await db.from("jobs").update(update).eq("org_id", org.id).eq("id", id).select("id")
   if (error) redirect(`${safeBack(formData)}${safeBack(formData).includes("?") ? "&" : "?"}fejl=${encodeURIComponent(error.message)}`)
   if (!updated?.length) return
+  const { data: before } = await db.from("job_assignments").select("employee_id").eq("org_id", org.id).eq("job_id", id)
   await db.from("job_assignments").delete().eq("org_id", org.id).eq("job_id", id)
   if (employees.length) await db.from("job_assignments").insert(employees.map((employee_id) => ({ org_id: org.id, job_id: id, employee_id })))
+  const prev = new Set((before ?? []).map((b) => String(b.employee_id)))
+  const when = update.scheduled_start ? new Date(update.scheduled_start as string).toLocaleString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : ""
+  await notifyUsers(org, employees.filter((e) => !prev.has(e)), { kind: "shift", title: "Du har fået en ny vagt", body: when, href: "/medarbejder/vagter" })
+  await notifyUsers(org, employees.filter((e) => prev.has(e)), { kind: "shift", title: "En af dine vagter er ændret", body: when, href: "/medarbejder/vagter" })
+  await notifyUsers(org, [...prev].filter((e) => !employees.includes(e)), { kind: "shift", title: "Du er taget af en vagt", body: when, href: "/medarbejder/vagter" })
   refresh()
   redirect(`${safeBack(formData)}${safeBack(formData).includes("?") ? "&" : "?"}gemt=1`)
 }
@@ -199,6 +207,7 @@ export async function assignEmployeeToDays(formData: FormData) {
   if (add.length) {
     const { error: insertError } = await db.from("job_assignments").insert(add.map((j) => ({ org_id: org.id, job_id: j.id, employee_id: employeeId })))
     if (insertError) redirect(`${back}${sep}fejl=${encodeURIComponent(insertError.message)}`)
+    await notifyUsers(org, [employeeId], { kind: "shift", title: add.length === 1 ? "Du har fået en ny vagt" : `Du har fået ${add.length} nye vagter`, body: "Se dine vagter i appen.", href: "/medarbejder/vagter" })
     const full = add.filter((j) => (countByJob.get(String(j.id)) ?? 0) + 1 >= Number(j.max_staff ?? 1)).map((j) => String(j.id))
     if (full.length) await db.from("jobs").update({ is_open: false }).eq("org_id", org.id).in("id", full)
   }

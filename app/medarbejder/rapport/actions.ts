@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer, notifyUsers } from "@/lib/backend/notify"
 import { getViewAs } from "@/lib/view-as"
 
 import { revalidatePath } from "next/cache"
@@ -36,7 +37,8 @@ async function openSupplyRequest(org: Org, fields: { location_id: string | null;
 }
 
 export async function saveReport(formData: FormData) {
-  const { org, user } = await requireRoleAction(["employee", "admin"])
+  const { org, user, ctx } = await requireRoleAction(["employee", "admin"])
+  if (await getViewAs(ctx)) redirect("/medarbejder")
   const reportId = text(formData, "report_id", 64)
   const report = await ownReport(org.id, reportId, user.id)
   const db = createAdminClient()
@@ -68,6 +70,13 @@ export async function saveReport(formData: FormData) {
   const submit = text(formData, "intent", 20) === "submit"
   await db.from("cleaning_reports").update({ note: text(formData, "note", 4000) || null, updated_at: new Date().toISOString(), ...(submit ? { status: "submitted", submitted_at: new Date().toISOString() } : {}) }).eq("org_id", org.id).eq("id", reportId)
 
+  if (submit) {
+    const { data: r } = await db.from("cleaning_reports").select("customer_visible, location:locations(name, customer_id)").eq("org_id", org.id).eq("id", reportId).maybeSingle()
+    const loc = r?.location as unknown as { name: string; customer_id: string | null } | null
+    const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+    await notifyAdmins(org, { kind: "report", title: `Rapport fra ${loc?.name ?? "et sted"}`, body: `${me?.full_name ?? "En medarbejder"} har afsluttet rengøringen.`, href: `/admin/rapporter/${reportId}` }, user.id)
+    if (r?.customer_visible && loc?.customer_id) await notifyCustomer(org, loc.customer_id, { kind: "report", title: "Rengøringen er udført", body: `Se rapporten for ${loc.name}.`, href: "/kunde/rapporter" })
+  }
   if (newlyMissing.length) {
     const { data: names } = await db.from("products").select("name").eq("org_id", org.id).in("id", newlyMissing)
     const { data: loc } = report.location_id ? await db.from("locations").select("name").eq("org_id", org.id).eq("id", report.location_id).maybeSingle() : { data: null }
@@ -109,6 +118,7 @@ export async function requestSupply(formData: FormData) {
   const urgent = formData.get("urgent") === "on"
   await db.from("supply_requests").insert({ org_id: org.id, location_id: locationId, product_id: productId, employee_id: user.id, message: message || "Mangler", urgent })
   if (locationId && productId) await db.from("location_products").upsert({ org_id: org.id, location_id: locationId, product_id: productId, status: "missing", updated_at: new Date().toISOString(), updated_by: user.id }, { onConflict: "location_id,product_id" })
+  await notifyAdmins(org, { kind: "supply", title: `${urgent ? "HASTER: " : ""}Mangler`, body: message || "En medarbejder mangler noget.", href: "/admin/forsyning" }, user.id)
   await notifyOffice(org, `${urgent ? "HASTER: " : ""}Medarbejder mangler noget`, `${message}\n\nSe forsyning: ${appUrl()}/admin/forsyning`)
   revalidatePath("/admin/forsyning")
   redirect("/medarbejder?mangler=sendt")

@@ -22,6 +22,7 @@ export type Quote = {
   total: number | null
   public_token: string
   contact_request_id: string | null
+  customer_id: string | null
   sent_at: string | null
   viewed_at: string | null
   accepted_at: string | null

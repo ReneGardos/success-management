@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireRoleAction } from "@/lib/auth-guard"
@@ -175,6 +176,7 @@ export async function sendInvoice(formData: FormData) {
     fail(editor(id), error instanceof Error ? error.message : "Fakturaen blev ikke sendt")
   }
   await db.from("invoices").update({ status: inv?.status === "draft" ? (inv.credit_of ? "credited" : "sent") : inv?.status, sent_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", id)
+  if (inv) await notifyCustomer(org, inv.customer_id, { kind: "invoice", title: `${inv.credit_of ? "Kreditnota" : "Faktura"} ${invoiceNo(org, inv)}`, body: `Fra ${org.name}`, href: "/kunde/fakturaer" })
   revalidatePath("/admin", "layout")
   redirect(`${editor(id)}?sendt=1`)
 }

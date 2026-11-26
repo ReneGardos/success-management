@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer, notifyUsers } from "@/lib/backend/notify"
 import { redirect } from "next/navigation"
 import { Resend } from "resend"
 import { requireRoleAction } from "@/lib/auth-guard"
@@ -27,6 +28,7 @@ export async function submitCustomerFeedback(formData: FormData) {
   const { data: profile } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
   const { data: fb } = await db.from("customer_feedback").insert({ org_id: org.id, location_id: locationId, customer_id: customerId, author_user_id: user.id, author_name: profile?.full_name ?? user.email, message }).select("id").single()
   if (mailConfigured()) await new Resend(process.env.RESEND_API_KEY).emails.send({ from: orgSender(org, "noreply"), to: [officeEmailFor(org)], subject: "Ny feedback fra kundeportalen", text: `${profile?.full_name ?? user.email} skrev:\n\n${message}\n\nSe: ${appUrl()}/admin/feedback` }).catch(() => {})
+  await notifyAdmins(org, { kind: "feedback", title: "Ny kundefeedback", body: message.slice(0, 140), href: "/admin/feedback" })
   redirect(`/kunde/feedback?tak=${fb?.id ?? ""}`)
 }
 
@@ -78,5 +80,6 @@ export async function orderExtra(formData: FormData) {
   await db.from("contact_requests").insert({ id: requestId, org_id: org.id, name, email, phone: profile?.phone ?? cust?.phone ?? null, company: cust?.company ?? null, service: services?.map((s) => s.name).join(", ").slice(0, 80) || null, message, source: "kundeportal" })
   await db.from("leads").insert({ org_id: org.id, contact_request_id: requestId, name, company: cust?.company ?? null, email, phone: profile?.phone ?? null, message, source: "kundeportal", customer_id: cust?.id ?? null })
   if (mailConfigured()) await new Resend(process.env.RESEND_API_KEY).emails.send({ from: orgSender(org, "noreply"), to: [officeEmailFor(org)], subject: `Bestilling fra ${cust?.company || name}`, text: `${message}\n\nSvar i indbakken: ${appUrl()}/admin/mail/${requestId}` }).catch(() => {})
+  await notifyAdmins(org, { kind: "order", title: `Bestilling fra ${cust?.company || name}`, body: message.split("\n").slice(1).join(" · ").slice(0, 160), href: `/admin/mail/${requestId}` })
   redirect("/kunde/bestil?sendt=1")
 }

@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { headers } from "next/headers"
 import { Resend } from "resend"
@@ -28,6 +29,7 @@ export async function respondToQuote(token: string, answer: "accept" | "decline"
     : { status: "declined", declined_at: now }
   const { error } = await createAdminClient().from("quotes").update(update).eq("org_id", org.id).eq("id", quote.id)
   if (error) return { ok: false, message: `Noget gik galt. Prøv igen${call}.` }
+  await notifyAdmins(org, { kind: "quote", title: answer === "accept" ? `✅ Tilbud #${quote.quote_number} accepteret` : `Tilbud #${quote.quote_number} afvist`, body: quote.recipient_company || quote.recipient_name || "", href: `/admin/tilbud/${quote.id}` })
 
   if (mailConfigured()) {
     const { subtotal } = totals(quote.lines, quote.vat_rate)
