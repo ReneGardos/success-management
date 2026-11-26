@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer, notifyUsers } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { Resend } from "resend"
@@ -22,8 +23,10 @@ export async function requestAbsence(formData: FormData) {
   // Sickness is registered right away; holiday needs approval.
   const status = kind === "sick" || kind === "child_sick" ? "approved" : "pending"
   await createAdminClient().from("employee_absences").insert({ org_id: org.id, employee_id: user.id, kind, starts_on: from, ends_on: to, note, status })
+  const { data: who } = await createAdminClient().from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+  await notifyAdmins(org, { kind: "absence", title: `${kinds[kind]}: ${who?.full_name ?? user.email}`, body: `${from}${to !== from ? ` – ${to}` : ""}${status === "pending" ? " · venter på godkendelse" : ""}`, href: "/admin/fravaer" }, user.id)
   if (mailConfigured()) {
-    const { data: p } = await createAdminClient().from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+    const p = who
     await new Resend(process.env.RESEND_API_KEY).emails.send({ from: orgSender(org, "noreply"), to: [officeEmailFor(org)], subject: `${kinds[kind]}: ${p?.full_name ?? user.email} ${from}${to !== from ? `–${to}` : ""}`, text: `${p?.full_name ?? user.email} har meldt ${kinds[kind].toLowerCase()} ${from}${to !== from ? ` til ${to}` : ""}.${note ? `\n\n${note}` : ""}\n\nSe: ${appUrl()}/admin/fravaer` }).catch(() => {})
   }
   revalidatePath("/medarbejder", "layout")

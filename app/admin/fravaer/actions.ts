@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer, notifyUsers } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { Resend } from "resend"
 import { requireRoleAction } from "@/lib/auth-guard"
@@ -19,7 +20,9 @@ export async function decideAbsence(formData: FormData) {
   const { data: a } = await db.from("employee_absences").update({ status, decided_by: status === "pending" ? null : user.id, decided_at: status === "pending" ? null : new Date().toISOString() }).eq("org_id", org.id).eq("id", id).select("employee_id, kind, starts_on, ends_on").maybeSingle()
   revalidatePath("/admin/fravaer")
   revalidatePath("/admin/vagtplan")
-  if (!a || status === "pending" || !mailConfigured()) return
+  if (!a || status === "pending") return
+  await notifyUsers(org, [a.employee_id], { kind: "absence", title: `Fravær ${status === "approved" ? "godkendt" : "afvist"}`, body: `${a.starts_on}${a.ends_on !== a.starts_on ? ` – ${a.ends_on}` : ""}`, href: "/medarbejder/fravaer" })
+  if (!mailConfigured()) return
   const { data: emp } = await db.auth.admin.getUserById(a.employee_id)
   if (!emp.user?.email) return
   const d = (x: string) => new Date(`${x}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "long" })

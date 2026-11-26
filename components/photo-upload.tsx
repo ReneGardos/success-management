@@ -8,7 +8,7 @@ import { createClient } from "@/lib/supabase/client"
 type Target = { path: string; token: string }
 
 /** Shrinks a photo in the browser (max 1600 px, JPEG) before upload, so it works on mobile data. */
-async function shrink(file: File): Promise<Blob> {
+export async function shrink(file: File): Promise<Blob> {
   try {
     const bitmap = await createImageBitmap(file)
     const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height))

@@ -2,6 +2,8 @@ import Link from "next/link"
 import type { Org } from "@/lib/org"
 import type { ViewAs } from "@/lib/view-as"
 import ViewAsBanner from "@/components/view-as-banner"
+import NotificationBell from "@/components/notification-bell"
+import { vapidPublicKey } from "@/lib/backend/push"
 import PortalNav, { type NavItem } from "@/components/portal-nav"
 
 /** Branded frame for the employee and customer areas. */
@@ -19,6 +21,7 @@ export default function PortalShell({ org, title, subtitle, items, root, preview
           <span><strong>{title}</strong><small>{subtitle}</small></span>
         </Link>
         <div className="pt-top-actions">
+          {!preview && <NotificationBell pushKey={vapidPublicKey()} tone="dark" />}
           {canSwitch && <Link href="/vaelg-virksomhed?skift=1">Skift virksomhed</Link>}
           <form action="/auth/sign-out" method="post"><button type="submit">Log ud</button></form>
         </div>

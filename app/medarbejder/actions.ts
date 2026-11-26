@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer, notifyUsers } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { requireRoleAction } from "@/lib/auth-guard"
 import { createAdminClient } from "@/lib/supabase/admin"
@@ -41,6 +42,8 @@ export async function claimShift(jobId: string) {
   const { error } = await db.from("job_assignments").insert({ org_id: org.id, job_id: jobId, employee_id: user.id })
   if (error) return { ok: false, message: "Kunne ikke tage vagten. Prøv igen." }
   if ((current ?? []).length + 1 >= (job.max_staff ?? 1)) await db.from("jobs").update({ is_open: false }).eq("org_id", org.id).eq("id", jobId)
+  const { data: me } = await db.from("profiles").select("full_name").eq("id", user.id).maybeSingle()
+  await notifyAdmins(org, { kind: "shift", title: "Ledig vagt taget", body: `${me?.full_name ?? "En medarbejder"} tog vagten ${job.scheduled_start ? new Date(job.scheduled_start).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short" }) : ""}.`, href: `/admin/vagtplan?vagt=${jobId}` }, user.id)
   refresh()
   return { ok: true, message: "Vagten er din." }
 }

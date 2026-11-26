@@ -1,5 +1,6 @@
 "use server"
 
+import { notifyAdmins, notifyCustomer } from "@/lib/backend/notify"
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { requireRoleAction } from "@/lib/auth-guard"
@@ -129,6 +130,7 @@ export async function sendQuote(formData: FormData) {
     redirect(`${editor(id)}?fejl=${encodeURIComponent(error instanceof Error ? error.message : "Tilbuddet blev ikke sendt")}`)
   }
   await createAdminClient().from("quotes").update({ status: "sent", sent_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", id)
+  await notifyCustomer(org, quote.customer_id, { kind: "quote", title: `Nyt tilbud fra ${org.name}`, body: quote.title || `Tilbud nr. ${quote.quote_number}`, href: "/kunde/tilbud" })
   revalidatePath("/admin", "layout")
   redirect(`${editor(id)}?sendt=1`)
 }

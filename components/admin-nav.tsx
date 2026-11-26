@@ -3,7 +3,8 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import NotificationBell from "@/components/notification-bell"
+import { MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -17,6 +18,7 @@ const groups = [
   ] },
   { title: "Kunder og salg", links: [
     { href: "/admin/mail", label: "Indbakke", icon: Mail },
+    { href: "/admin/beskeder", label: "Beskeder", icon: MessagesSquare },
     { href: "/admin/leads", label: "Pipeline", icon: Kanban },
     { href: "/admin/kunder", label: "Kunder", icon: Contact },
     { href: "/admin/tilbud", label: "Tilbud", icon: FileSignature },
@@ -39,7 +41,7 @@ type NavOrg = { id: string; name: string; logoUrl: string | null; website: strin
 type NavMembership = { orgId: string; name: string; role: string }
 
 /** Admin sidebar + topbar with organization switcher. */
-export default function AdminNav({ org, memberships, isSuperadmin }: { org: NavOrg; memberships: NavMembership[]; isSuperadmin: boolean }) {
+export default function AdminNav({ org, memberships, isSuperadmin, pushKey = "", badges = {} }: { org: NavOrg; memberships: NavMembership[]; isSuperadmin: boolean; pushKey?: string; badges?: Record<string, number> }) {
   const pathname = usePathname() ?? ""
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [pathname])
@@ -85,7 +87,7 @@ export default function AdminNav({ org, memberships, isSuperadmin }: { org: NavO
               <p className="adm-menu-title">{g.title}</p>
               {g.links.map(({ href, label, icon: Icon, exact }) => (
                 <Link key={href} href={href} aria-current={isActive(href, exact) ? "page" : undefined}>
-                  <Icon className="size-[18px]" aria-hidden="true" /><span>{label}</span>
+                  <Icon className="size-[18px]" aria-hidden="true" /><span>{label}</span>{badges[href] ? <b className="adm-badge">{badges[href]}</b> : null}
                 </Link>
               ))}
             </div>
@@ -107,6 +109,7 @@ export default function AdminNav({ org, memberships, isSuperadmin }: { org: NavO
           <kbd className="adm-hide-sm">/</kbd>
         </form>
         <div className="adm-topbar-actions">
+          <NotificationBell pushKey={pushKey} />
           <Link href="/admin/fakturaer" className="adm-btn adm-btn-light adm-hide-sm">Faktura</Link>
           <Link href="/admin/vagtplan?ny=1" className="adm-btn adm-btn-primary adm-hide-sm">+ Ny vagt</Link>
           <form action="/auth/sign-out" method="post"><button type="submit" className="adm-btn adm-btn-light" aria-label="Log ud"><LogOut className="size-4" aria-hidden="true" /><span className="adm-hide-sm">Log ud</span></button></form>
