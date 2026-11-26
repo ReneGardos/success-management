@@ -12,7 +12,7 @@ export default async function CustomerPage() {
   const db = createAdminClient()
   const { data: customer } = await db.from("customers").select("id, address").eq("org_id", org.id).eq("profile_id", user.id).maybeSingle()
   // Quotes linked to the customer record, or sent to the customer's login email.
-  const filters = [customer ? `customer_id.eq.${customer.id}` : null, user.email ? `recipient_email.eq.${user.email}` : null].filter(Boolean).join(",")
+  const filters = [customer ? `customer_id.eq.${customer.id}` : null, user.email && /^[^,()\s"]+$/.test(user.email) ? `recipient_email.eq.${user.email}` : null].filter(Boolean).join(",")
   const { data: quotes } = filters
     ? await db.from("quotes").select("id, quote_number, title, status, total, billing, public_token").eq("org_id", org.id).neq("status", "draft").or(filters).order("created_at", { ascending: false }).limit(20)
     : { data: [] }

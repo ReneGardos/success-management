@@ -33,6 +33,13 @@ export type Org = {
   inbound_alias: string | null
   quote_default_intro: string | null
   quote_default_terms: string | null
+  invoice_prefix: string | null
+  payment_terms_days: number
+  bank_reg: string | null
+  bank_account: string | null
+  iban: string | null
+  mobilepay: string | null
+  invoice_footer: string | null
   plan: string
   subscription_status: string
   active: boolean
@@ -51,7 +58,7 @@ export type OrgContext = {
 }
 
 export const ORG_COLUMNS =
-  "id, slug, name, legal_name, cvr, address, phone, office_email, website, domain, logo_url, email_logo_url, color_primary, color_accent, color_background, color_muted, font_family, mail_from_name, mail_from_local, mail_domain, mail_domain_verified, resend_domain_id, inbound_alias, quote_default_intro, quote_default_terms, plan, subscription_status, active"
+  "id, slug, name, legal_name, cvr, address, phone, office_email, website, domain, logo_url, email_logo_url, color_primary, color_accent, color_background, color_muted, font_family, mail_from_name, mail_from_local, mail_domain, mail_domain_verified, resend_domain_id, inbound_alias, quote_default_intro, quote_default_terms, invoice_prefix, payment_terms_days, bank_reg, bank_account, iban, mobilepay, invoice_footer, plan, subscription_status, active"
 
 /** Signed-in user, memberships and the active organization (cookie → last used → first). Cached per request. */
 export const getOrgContext = cache(async (): Promise<OrgContext | null> => {

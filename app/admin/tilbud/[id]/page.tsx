@@ -7,6 +7,7 @@ import QuoteDocument from "@/components/quote-document"
 import BannerSelect from "@/components/banner-select"
 import { loadBanners, loadMailSettings } from "@/lib/backend/mail-settings"
 import { deleteQuote, duplicateQuote, saveQuote, sendQuote, setQuoteStatus } from "../actions"
+import { invoiceFromQuote } from "../../fakturaer/actions"
 
 export const dynamic = "force-dynamic"
 
@@ -39,6 +40,7 @@ export default async function QuoteEditor({ params, searchParams }: { params: Pr
           <div className="admin-week-nav">
             <a href={`/t/${quote.public_token}`} target="_blank" rel="noreferrer" className="admin-view-site"><ExternalLink className="size-4" /> Se som kunde</a>
             <form action={duplicateQuote}><input type="hidden" name="id" value={quote.id} /><button className="admin-view-site" type="submit"><Copy className="size-4" /> Kopiér</button></form>
+            {quote.status === "accepted" && <form action={invoiceFromQuote}><input type="hidden" name="quote_id" value={quote.id} /><button className="admin-primary" type="submit">Lav faktura</button></form>}
           </div>
         </div>
 

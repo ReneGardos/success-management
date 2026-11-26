@@ -60,7 +60,9 @@ export async function saveLead(org: Org, siteId: string | null, lead: ContactLea
   const { error: leadError } = await db.from("leads").insert({
     org_id: org.id,
     contact_request_id: lead.id,
-    name: lead.company ? `${lead.name} (${lead.company})` : lead.name,
+    name: lead.name,
+    company: lead.company || null,
+    source: lead.source,
     email: lead.email,
     phone: lead.phone || null,
     message: details || lead.message,

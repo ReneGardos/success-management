@@ -3,7 +3,7 @@
 import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
-import { BarChart3, Building2, CalendarDays, Clock, ExternalLink, FileSignature, FileText, Globe, LayoutDashboard, LogOut, Mail, MapPin, Menu, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { BarChart3, Building2, CalendarDays, Clock, Contact, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -13,9 +13,11 @@ const groups = [
     { href: "/admin/steder", label: "Steder", icon: MapPin },
   ] },
   { title: "Kunder og salg", links: [
-    { href: "/admin/mail", label: "Mail", icon: Mail },
+    { href: "/admin/mail", label: "Indbakke", icon: Mail },
+    { href: "/admin/leads", label: "Pipeline", icon: Kanban },
+    { href: "/admin/kunder", label: "Kunder", icon: Contact },
     { href: "/admin/tilbud", label: "Tilbud", icon: FileSignature },
-    { href: "/admin/leads", label: "Leads", icon: FileText },
+    { href: "/admin/fakturaer", label: "Fakturaer", icon: Receipt },
   ] },
   { title: "Team og system", links: [
     { href: "/admin/statistik", label: "Statistik", icon: BarChart3 },
@@ -35,6 +37,17 @@ export default function AdminNav({ org, memberships, isSuperadmin }: { org: NavO
   const pathname = usePathname() ?? ""
   const [open, setOpen] = useState(false)
   useEffect(() => setOpen(false), [pathname])
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null
+      if (e.key === "/" && !(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable))) {
+        e.preventDefault()
+        document.querySelector<HTMLInputElement>(".adm-search input")?.focus()
+      }
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [])
   const isActive = (href: string, exact?: boolean) => (exact ? pathname === href : pathname.startsWith(href))
   const current = [...allLinks].sort((a, b) => b.href.length - a.href.length).find((l) => isActive(l.href, l.exact))
 
@@ -82,9 +95,14 @@ export default function AdminNav({ org, memberships, isSuperadmin }: { org: NavO
       <header className="adm-topbar">
         <button type="button" className="adm-toggle" onClick={() => setOpen(true)} aria-label="Åbn menu" aria-expanded={open}><Menu className="size-5" /></button>
         <nav aria-label="Brødkrumme" className="adm-crumbs"><Link href="/admin">{org.name}</Link>{current && current.href !== "/admin" && <><span>/</span><strong>{current.label}</strong></>}</nav>
+        <form action="/admin/soeg" method="get" className="adm-search" role="search">
+          <Search className="size-4" aria-hidden="true" />
+          <input name="q" type="search" placeholder="Søg kunder, leads, tilbud, fakturaer…" aria-label="Søg" />
+          <kbd className="adm-hide-sm">/</kbd>
+        </form>
         <div className="adm-topbar-actions">
+          <Link href="/admin/fakturaer" className="adm-btn adm-btn-light adm-hide-sm">Faktura</Link>
           <Link href="/admin/vagtplan?ny=1" className="adm-btn adm-btn-primary adm-hide-sm">+ Ny vagt</Link>
-          <Link href="/admin/tilbud" className="adm-btn adm-btn-light adm-hide-sm">Tilbud</Link>
           <form action="/auth/sign-out" method="post"><button type="submit" className="adm-btn adm-btn-light" aria-label="Log ud"><LogOut className="size-4" aria-hidden="true" /><span className="adm-hide-sm">Log ud</span></button></form>
         </div>
       </header>
