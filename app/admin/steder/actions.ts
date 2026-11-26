@@ -54,3 +54,12 @@ export async function toggleLocation(formData: FormData) {
   await createAdminClient().from("locations").update({ active, updated_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", id)
   revalidatePath(back)
 }
+
+/** New QR token for a location (old printed signs stop working). */
+export async function renewQr(formData: FormData) {
+  const { org } = await requireRoleAction(["admin"])
+  const id = String(formData.get("id") ?? "")
+  const { randomBytes } = await import("node:crypto")
+  await createAdminClient().from("locations").update({ qr_token: randomBytes(12).toString("hex") }).eq("org_id", org.id).eq("id", id)
+  revalidatePath(`/admin/steder/${id}/qr`)
+}

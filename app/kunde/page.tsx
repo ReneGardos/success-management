@@ -47,6 +47,7 @@ export default async function CustomerOverview() {
             {(upcoming ?? []).map((j) => <li key={j.id}><span><strong>{formatDay(j.scheduled_start!)}</strong><small>{(j.location as unknown as { name: string } | null)?.name ?? j.title}</small></span><b>{formatTime(j.scheduled_start!)}{j.scheduled_end ? `–${formatTime(j.scheduled_end)}` : ""}</b></li>)}
             {!upcoming?.length && <li className="pt-muted">Ingen planlagte besøg.</li>}
           </ul>
+          <Link href="/kunde/besoeg" className="pt-more">Flyt, spring over eller tilføj til kalender</Link>
         </section>
         <section className="pt-card">
           <h2>Seneste rapporter</h2>

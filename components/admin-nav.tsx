@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import NotificationBell from "@/components/notification-bell"
-import { MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { CalendarClock, MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -12,6 +12,7 @@ const groups = [
     { href: "/admin/vagtplan", label: "Vagtplan", icon: CalendarDays },
     { href: "/admin/timer", label: "Timer", icon: Clock },
     { href: "/admin/fravaer", label: "Fravær", icon: CalendarOff },
+    { href: "/admin/besoeg", label: "Kundeønsker", icon: CalendarClock },
     { href: "/admin/steder", label: "Steder", icon: MapPin },
     { href: "/admin/rapporter", label: "Rapporter", icon: ClipboardCheck },
     { href: "/admin/forsyning", label: "Forsyning", icon: PackageOpen },

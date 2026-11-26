@@ -1,5 +1,5 @@
 import Link from "next/link"
-import { CalendarOff, ClipboardList, Clock, PackageOpen } from "lucide-react"
+import { CalendarOff, ClipboardList, Clock, Navigation, PackageOpen } from "lucide-react"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { employeePortal } from "@/lib/portal"
 import { loadShifts, shiftName } from "@/lib/backend/shifts"
@@ -61,7 +61,7 @@ export default async function EmployeeToday({ searchParams }: { searchParams: Pr
         <Link href="/medarbejder/mangler"><PackageOpen className="size-6" /><span>Mangler noget</span>{openReq ? <b>{openReq}</b> : null}</Link>
         <Link href="/medarbejder/fravaer"><CalendarOff className="size-6" /><span>Meld fravær</span>{pendingAbs ? <b>{pendingAbs}</b> : null}</Link>
         <Link href="/medarbejder/vagter?vis=ledige"><ClipboardList className="size-6" /><span>Ledige vagter</span></Link>
-        <Link href="/medarbejder/timer"><Clock className="size-6" /><span>Mine timer</span></Link>
+        <Link href="/medarbejder/rute"><Navigation className="size-6" /><span>Dagens rute</span></Link>
       </div>
 
       {missingReports.length > 0 && (

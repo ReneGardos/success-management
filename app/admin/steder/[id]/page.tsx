@@ -29,7 +29,10 @@ export default async function LocationDetail({ params, searchParams }: { params:
       <Link href="/admin/steder" className="crm-back"><ArrowLeft className="size-4" /> Steder</Link>
       <header className="crm-head">
         <div><p className="crm-kicker">Sted{cust ? <> · <Link href={`/admin/kunder/${cust.id}`}>{cust.company || cust.name}</Link></> : null}</p><h1>{loc.name}</h1><p className="crm-head-sub"><MapPin className="size-3 inline" /> <a href={mapsLink(loc.address)} target="_blank" rel="noreferrer">{loc.address}</a></p></div>
-        <form action={importTasksFromQuote}><input type="hidden" name="location_id" value={loc.id} /><button className="crm-btn crm-btn-primary" type="submit"><Download className="size-4" /> Hent opgaver fra tilbud</button></form>
+        <div className="crm-inline">
+          <Link href={`/admin/steder/${loc.id}/qr`} className="crm-btn">QR-skilt til check-in</Link>
+          <form action={importTasksFromQuote}><input type="hidden" name="location_id" value={loc.id} /><button className="crm-btn crm-btn-primary" type="submit"><Download className="size-4" /> Hent opgaver fra tilbud</button></form>
+        </div>
       </header>
       {sp.hentet && <p className="admin-notice is-ok" role="status">{sp.hentet} opgaver hentet fra det accepterede tilbud.</p>}
       {sp.fejl && <p className="admin-notice is-error" role="alert">{sp.fejl}</p>}

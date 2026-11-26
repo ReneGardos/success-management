@@ -6,7 +6,9 @@ import { createAdminClient } from "@/lib/supabase/admin"
 import { ensureReport, loadProducts, loadReport, photoKindLabels } from "@/lib/backend/reports"
 import { formatTime } from "@/lib/time"
 import PhotoUpload from "@/components/photo-upload"
-import { registerReportPhoto, reportUploadTarget, saveReport } from "../actions"
+import ItemPhotos from "@/components/item-photos"
+import SignaturePad from "@/components/signature-pad"
+import { registerItemPhoto, registerReportPhoto, registerSignature, reportUploadTarget, saveReport, signatureUploadTarget } from "../actions"
 import { getViewAs } from "@/lib/view-as"
 
 export const dynamic = "force-dynamic"
@@ -72,6 +74,7 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
                   <span>{it.label}{it.area ? <small>{it.area}</small> : null}</span>
                 </label>
                 <input className="field-note" name={`note_${it.id}`} defaultValue={it.note ?? ""} placeholder="Bemærkning – fx hvorfor ikke udført" />
+                <ItemPhotos disabled={Boolean(preview)} thumbs={report.photos.filter((ph) => ph.item_id === it.id && ph.url).map((ph) => ({ id: ph.id, url: ph.url!, kind: ph.kind }))} requestTarget={reportUploadTarget.bind(null, report.id)} register={registerItemPhoto.bind(null, report.id, it.id)} />
               </li>
             ))}
           </ul>
@@ -114,11 +117,19 @@ export default async function ReportForm({ params, searchParams }: { params: Pro
       </form>
 
       <section className="field-card">
+        <h2>Kundens kvittering <small>valgfri</small></h2>
+        <p className="field-hint">Lad kunden skrive under på skærmen, hvis de er til stede.</p>
+        {preview
+          ? (report.signatureUrl ? <div className="sig-done">{/* eslint-disable-next-line @next/next/no-img-element */}<img src={report.signatureUrl} alt="Underskrift" /></div> : <p className="field-hint">Ingen underskrift.</p>)
+          : <SignaturePad requestTarget={signatureUploadTarget.bind(null, report.id)} register={registerSignature.bind(null, report.id)} existingUrl={report.signatureUrl} existingName={report.signed_name} />}
+      </section>
+
+      <section className="field-card">
         <h2>Billeder</h2>
         {!preview && <PhotoUpload requestTarget={reportUploadTarget.bind(null, report.id)} register={registerReportPhoto.bind(null, report.id)} kinds={[{ value: "issue", label: "Problem" }, { value: "unusual", label: "Usædvanligt" }, { value: "before", label: "Før" }, { value: "after", label: "Efter" }]} />}
-        {report.photos.length > 0 && (
+        {report.photos.some((ph) => !ph.item_id) && (
           <div className="field-photos">
-            {report.photos.map((ph) => ph.url && (
+            {report.photos.filter((ph) => !ph.item_id && ph.kind !== "signature").map((ph) => ph.url && (
               <figure key={ph.id}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={ph.url} alt={ph.caption ?? photoKindLabels[ph.kind]} />

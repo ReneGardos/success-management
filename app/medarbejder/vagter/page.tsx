@@ -5,6 +5,8 @@ import { loadShifts, type Shift } from "@/lib/backend/shifts"
 import { addDays, copenhagenToIso, dayKey, formatDay, mondayOf, todayLocal, weekNumber } from "@/lib/time"
 import { ClaimButton } from "@/components/employee-shift-actions"
 import ShiftCard from "@/components/shift-card"
+import CalendarSubscribe from "@/components/calendar-subscribe"
+import { calendarFeed } from "@/lib/backend/calendar"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Vagter" }
@@ -28,6 +30,7 @@ export default async function EmployeeShifts({ searchParams }: { searchParams: P
   const weeks = new Map<string, Shift[]>()
   for (const s of list) if (s.scheduled_start) { const w = mondayOf(dayKey(s.scheduled_start)); weeks.set(w, [...(weeks.get(w) ?? []), s]) }
   const off = (day: string) => (absences ?? []).some((a) => a.starts_on <= day && a.ends_on >= day)
+  const feed = preview ? null : await calendarFeed(org.id, userId, "employee", null)
   const hours = list.reduce((s, x) => s + (x.scheduled_start && x.scheduled_end ? (new Date(x.scheduled_end).getTime() - new Date(x.scheduled_start).getTime()) / 3600000 : 0), 0)
 
   return (
@@ -37,6 +40,7 @@ export default async function EmployeeShifts({ searchParams }: { searchParams: P
         <Link href="?vis=mine" aria-current={vis !== "ledige" ? "page" : undefined}>Mine vagter</Link>
         <Link href="?vis=ledige" aria-current={vis === "ledige" ? "page" : undefined}>Ledige vagter</Link>
       </nav>
+      <div className="pt-cta"><CalendarSubscribe feed={feed} label="Vagter i min kalender" /><Link href="/medarbejder/rute" className="field-btn">Dagens rute</Link></div>
       {[...weeks.entries()].map(([w, shifts]) => (
         <section key={w} className="pt-section">
           <h2>Uge {weekNumber(w)} <small>{new Date(`${w}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "UTC" })}–{new Date(`${addDays(w, 6)}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short", timeZone: "UTC" })}</small></h2>

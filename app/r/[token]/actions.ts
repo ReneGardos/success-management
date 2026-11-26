@@ -7,6 +7,7 @@ import { mailConfigured, officeEmailFor } from "@/lib/backend/mail"
 import { pathAllowed, photoUploadTarget } from "@/lib/backend/reports"
 import { appUrl, loadOrgById, orgSender } from "@/lib/org"
 import { isRateLimited } from "@/lib/backend/rate-limit"
+import { notifyAdmins } from "@/lib/backend/notify"
 
 async function reportFor(token: string) {
   if (!/^[a-f0-9]{20,64}$/.test(token)) return null
@@ -49,4 +50,24 @@ export async function registerFeedbackPhoto(token: string, feedbackId: string, p
   if (!pathAllowed(fb.org_id, `feedback/${fb.id}`, path)) return { ok: false, message: "Ugyldigt billede." }
   const { error } = await createAdminClient().from("photos").insert({ org_id: fb.org_id, feedback_id: fb.id, location_id: fb.location_id, kind: "customer", path, caption: caption.trim().slice(0, 200) || null })
   return { ok: !error, message: error?.message }
+}
+
+/** Star rating (1–5) + optional comment for a visit, from the report link or the customer portal. */
+export async function rateReport(token: string, formData: FormData) {
+  const report = await reportFor(token)
+  if (!report || report.status !== "submitted") redirect("/")
+  const rating = Number(formData.get("rating"))
+  const comment = String(formData.get("comment") ?? "").trim().slice(0, 1000) || null
+  const back = String(formData.get("back") ?? "") === "/kunde/rapporter" ? "/kunde/rapporter" : `/r/${token}`
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) redirect(`${back}?fejl=3#bedom`)
+  if (isRateLimited(`rate|${token}`, 10, 60 * 60 * 1000)) redirect(`${back}?fejl=2#bedom`)
+  const db = createAdminClient()
+  const { data: prev } = await db.from("cleaning_reports").select("customer_rating").eq("id", report!.id).maybeSingle()
+  await db.from("cleaning_reports").update({ customer_rating: rating, customer_comment: comment, rated_at: new Date().toISOString() }).eq("id", report!.id)
+  const org = await loadOrgById(report!.org_id)
+  if (org && !prev?.customer_rating) {
+    const { data: loc } = report!.location_id ? await db.from("locations").select("name").eq("id", report!.location_id).maybeSingle() : { data: null }
+    await notifyAdmins(org, { kind: "report", title: `${"★".repeat(rating)}${"☆".repeat(5 - rating)} ${loc?.name ?? "Besøg"}`, body: comment ?? (rating <= 3 ? "Lav bedømmelse – tag fat i kunden." : "Kunden har bedømt besøget."), href: `/admin/rapporter/${report!.id}` })
+  }
+  redirect(`${back}?bedomt=1#bedom`)
 }

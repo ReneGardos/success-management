@@ -97,3 +97,23 @@ export async function checkOut(entryId: string, pos: Position, note: string, mar
   refresh()
   return { ok: true, message: "Tjekket ud. Tak for i dag!" }
 }
+
+/** Check-in by scanning the QR sign at the location (proves presence without GPS). */
+export async function qrCheckIn(token: string, jobId: string) {
+  const { user, org, ctx } = await requireRoleAction(["employee", "admin"])
+  const { getViewAs } = await import("@/lib/view-as")
+  if (await getViewAs(ctx)) return { ok: false, message: "Visning er skrivebeskyttet." }
+  if (!/^[a-f0-9]{24}$/.test(token)) return { ok: false, message: "Ugyldig QR-kode." }
+  const db = createAdminClient()
+  const { data: loc } = await db.from("locations").select("id").eq("org_id", org.id).eq("qr_token", token).maybeSingle()
+  const { data: job } = loc ? await db.from("jobs").select("id, location_id, status").eq("org_id", org.id).eq("id", jobId).maybeSingle() : { data: null }
+  if (!loc || !job || job.location_id !== loc.id || job.status === "cancelled") return { ok: false, message: "QR-koden passer ikke til vagten." }
+  try { await assertAssigned(org.id, jobId, user.id) } catch { return { ok: false, message: "Vagten er ikke din." } }
+  const { data: openEntry } = await db.from("time_entries").select("id, job_id").eq("org_id", org.id).eq("employee_id", user.id).is("check_out_at", null).maybeSingle()
+  if (openEntry) return { ok: false, message: openEntry.job_id === jobId ? "Du er allerede tjekket ind her." : "Du er tjekket ind et andet sted. Tjek ud først." }
+  const { error } = await db.from("time_entries").insert({ org_id: org.id, job_id: jobId, employee_id: user.id, method: "qr", check_in_distance_m: 0 })
+  if (error) return { ok: false, message: "Kunne ikke tjekke ind. Prøv igen." }
+  await db.from("jobs").update({ status: "in_progress", updated_at: new Date().toISOString() }).eq("org_id", org.id).eq("id", jobId).eq("status", "scheduled")
+  refresh()
+  return { ok: true, message: "Tjekket ind med QR." }
+}
