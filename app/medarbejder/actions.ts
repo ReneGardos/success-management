@@ -74,7 +74,7 @@ export async function checkIn(jobId: string, pos: Position) {
   return { ok: true, message: distance !== null ? `Tjekket ind (${distance} m fra stedet).` : "Tjekket ind." }
 }
 
-export async function checkOut(entryId: string, pos: Position, note: string, markDone: boolean) {
+export async function checkOut(entryId: string, pos: Position, note: string, markDone: boolean, extra: { km?: number; breakMin?: number } = {}) {
   const { user, org } = await requireRoleAction(["employee", "admin"])
   const db = createAdminClient()
   const { data: entry } = await db.from("time_entries").select("id, job_id, employee_id").eq("org_id", org.id).eq("id", entryId).maybeSingle()
@@ -83,7 +83,7 @@ export async function checkOut(entryId: string, pos: Position, note: string, mar
   const cleanNote = note.trim().slice(0, 2000)
   const { error } = await db
     .from("time_entries")
-    .update({ check_out_at: new Date().toISOString(), check_out_lat: pos?.lat ?? null, check_out_lng: pos?.lng ?? null, check_out_distance_m: distance, ...(cleanNote ? { note: cleanNote } : {}) })
+    .update({ check_out_at: new Date().toISOString(), check_out_lat: pos?.lat ?? null, check_out_lng: pos?.lng ?? null, check_out_distance_m: distance, km: Math.max(0, Math.min(1000, Number(extra.km) || 0)), break_min: Math.max(0, Math.min(240, Math.round(Number(extra.breakMin) || 0))), ...(cleanNote ? { note: cleanNote } : {}) })
     .eq("org_id", org.id)
     .eq("id", entryId)
   if (error) return { ok: false, message: "Kunne ikke tjekke ud. Prøv igen." }

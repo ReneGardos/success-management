@@ -4,13 +4,14 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import NotificationBell from "@/components/notification-bell"
-import { Zap, CalendarClock, MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { PiggyBank, Wallet, Zap, CalendarClock, MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
     { href: "/admin", label: "Overblik", icon: LayoutDashboard, exact: true },
     { href: "/admin/vagtplan", label: "Vagtplan", icon: CalendarDays },
     { href: "/admin/timer", label: "Timer", icon: Clock },
+    { href: "/admin/loen", label: "Løn", icon: Wallet },
     { href: "/admin/fravaer", label: "Fravær", icon: CalendarOff },
     { href: "/admin/besoeg", label: "Kundeønsker", icon: CalendarClock },
     { href: "/admin/steder", label: "Steder", icon: MapPin },
@@ -28,6 +29,7 @@ const groups = [
     { href: "/admin/feedback", label: "Kundefeedback", icon: MessageCircleWarning },
   ] },
   { title: "Team og system", links: [
+    { href: "/admin/oekonomi", label: "Økonomi", icon: PiggyBank },
     { href: "/admin/statistik", label: "Statistik", icon: BarChart3 },
     { href: "/admin/brugere", label: "Medarbejdere", icon: Users },
     { href: "/admin/se-som", label: "Se som medarbejder/kunde", icon: Eye },

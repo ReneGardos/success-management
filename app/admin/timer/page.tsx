@@ -4,7 +4,7 @@ import { requireRolePage } from "@/lib/auth-guard"
 import { listStaff } from "@/lib/backend/staff"
 import { entryDurationMs, entryFarAway, entryPlace, loadTimeEntries } from "@/lib/backend/time-entries"
 import { addDays, copenhagenToIso, dayKey, formatDuration, formatTime, mondayOf, todayLocal, weekNumber } from "@/lib/time"
-import { correctEntry } from "./actions"
+import { approveEntries, correctEntry } from "./actions"
 
 export const dynamic = "force-dynamic"
 
@@ -28,6 +28,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
   for (const e of entries) totals.set(e.employee_id, (totals.get(e.employee_id) ?? 0) + entryDurationMs(e))
   const flagged = entries.filter(entryFarAway).length
   const open = entries.filter((e) => !e.check_out_at)
+  const unapproved = entries.filter((e) => e.check_out_at && !(e as unknown as { approved_at: string | null }).approved_at).length
   const qs = (extra: Record<string, string>) => new URLSearchParams({ ...(monthMode ? { periode: "maaned" } : {}), ...(sp.medarbejder ? { medarbejder: sp.medarbejder } : {}), ...extra }).toString()
   const exportUrl = `/api/admin/timer-csv?fra=${start}&til=${nextStart}${sp.medarbejder ? `&medarbejder=${sp.medarbejder}` : ""}`
 
@@ -42,6 +43,8 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
             <Link href={`?${qs({ uge: today })}`}>Nu</Link>
             <Link href={`?${qs({ uge: nextStart })}`} aria-label="Næste periode"><ChevronRight className="size-4" /></Link>
             <a href={exportUrl} className="admin-primary"><Download className="size-4" /> Excel</a>
+            <form action={approveEntries}><input type="hidden" name="from" value={start} /><input type="hidden" name="to" value={nextStart} />{sp.medarbejder && <input type="hidden" name="employee" value={sp.medarbejder} />}<button type="submit" className="admin-primary">✓ Godkend {unapproved} timer</button></form>
+            <Link href={`/admin/loen?fra=${start}&til=${nextStart}`}>Løn</Link>
           </div>
         </div>
 
@@ -70,6 +73,7 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
                   <strong>{names.get(e.employee_id) ?? "Ukendt"} · {entryPlace(e)}</strong>
                   <small>{new Date(e.check_in_at).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", weekday: "short", day: "numeric", month: "short" })} · {formatTime(e.check_in_at)}–{e.check_out_at ? formatTime(e.check_out_at) : "nu"} · {formatDuration(entryDurationMs(e))}</small>
                 </div>
+                {(e as unknown as { approved_at: string | null }).approved_at ? <span className="admin-badge status-won">✓ Godkendt</span> : e.check_out_at ? <span className="admin-badge">Ikke godkendt</span> : null}
                 {entryFarAway(e) && <span className="admin-badge status-new"><AlertTriangle className="size-3 inline" aria-hidden="true" /> {Math.max(e.check_in_distance_m ?? 0, e.check_out_distance_m ?? 0)} m fra stedet</span>}
               </summary>
               <div className="admin-location-body">
@@ -79,7 +83,9 @@ export default async function HoursPage({ searchParams }: { searchParams: Promis
                   <input type="hidden" name="id" value={e.id} />
                   <label>Dato<input name="date" type="date" defaultValue={dayKey(e.check_in_at)} /></label>
                   <div className="admin-form-row"><label>Ind<input name="check_in" type="time" defaultValue={formatTime(e.check_in_at)} /></label><label>Ud<input name="check_out" type="time" defaultValue={e.check_out_at ? formatTime(e.check_out_at) : ""} /></label></div>
+                  <div className="admin-form-row"><label>Pause (min)<input name="break_min" type="number" min={0} max={240} defaultValue={(e as unknown as { break_min: number }).break_min ?? 0} /></label><label>Kørsel (km)<input name="km" inputMode="decimal" defaultValue={String((e as unknown as { km: number }).km ?? 0)} /></label></div>
                   <label className="span-2">Note<input name="note" placeholder="Fx rettet: glemte at tjekke ud" /></label>
+                  <label className="admin-check-row span-2"><input type="checkbox" name="approve" defaultChecked /> Godkend timerne</label>
                   <div className="admin-form-actions span-2"><button type="submit">Gem rettelse</button></div>
                 </form>
               </div>
