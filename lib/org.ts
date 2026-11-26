@@ -119,5 +119,5 @@ export function orgSender(org: Org, local = org.mail_from_local || "kontakt") {
   return `${org.mail_from_name || org.name} <${local}@${domain}>`
 }
 
-export const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL || "https://success-management.vercel.app").replace(/\/$/, "")
+export const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL || "https://success-management-ruddy.vercel.app").replace(/\/$/, "")
 export const websiteUrl = (org: Org) => (org.website ? `https://${org.website.replace(/^https?:\/\//, "").replace(/\/$/, "")}` : appUrl())

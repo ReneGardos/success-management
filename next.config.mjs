@@ -12,7 +12,10 @@ const nextConfig = {
   turbopack: { root: __dirname },
   typescript: { ignoreBuildErrors: true },
   async headers() {
-    return [{ source: "/(.*)", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }, { key: "X-Frame-Options", value: "SAMEORIGIN" }] }]
+    return [
+      { source: "/(.*)", headers: [{ key: "X-Frame-Options", value: "SAMEORIGIN" }] },
+      { source: "/:area(admin|medarbejder|kunde|auth|t|superadmin|vaelg-virksomhed|org)/:path*", headers: [{ key: "X-Robots-Tag", value: "noindex, nofollow" }] },
+    ]
   },
 }
 
