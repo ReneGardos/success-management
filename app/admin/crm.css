@@ -315,3 +315,7 @@ a.crm-kpi:hover { border-color: color-mix(in srgb, var(--adm-primary) 35%, var(-
   .onsite-sum-actions { width: 100%; }
   .onsite-sum-actions .crm-btn { flex: 1; justify-content: center; }
 }
+.crm-right { text-align: right; }
+.crm-pill.abs-approved { background: #ECFDF3; color: #067647; }
+.crm-pill.abs-declined { background: #FEF3F2; color: #B42318; }
+.crm-pill.abs-pending { background: #FFFAEB; color: #B54708; }

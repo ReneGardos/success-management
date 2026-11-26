@@ -1,5 +1,7 @@
 "use server"
 
+import { getViewAs } from "@/lib/view-as"
+
 import { revalidatePath } from "next/cache"
 import { redirect } from "next/navigation"
 import { Resend } from "resend"
@@ -93,7 +95,8 @@ export async function registerReportPhoto(reportId: string, path: string, kind: 
 
 /** "Mangler noget?" – free-text or product request from an employee. */
 export async function requestSupply(formData: FormData) {
-  const { org, user } = await requireRoleAction(["employee", "admin"])
+  const { org, user, ctx } = await requireRoleAction(["employee", "admin"])
+  if (await getViewAs(ctx)) redirect("/medarbejder/mangler")
   const db = createAdminClient()
   const locationId = text(formData, "location_id", 64) || null
   const productId = text(formData, "product_id", 64) || null

@@ -52,6 +52,10 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
   const focus = sp.medarbejder && names.has(sp.medarbejder) ? sp.medarbejder : ""
   const { data: openEntries } = await createAdminClient().from("time_entries").select("job_id, employee_id").eq("org_id", org.id).is("check_out_at", null)
   const checkedIn = new Set((openEntries ?? []).map((e) => `${e.job_id}|${e.employee_id}`))
+  const { data: absences } = await createAdminClient().from("employee_absences").select("employee_id, kind, starts_on, ends_on, status").eq("org_id", org.id).in("status", ["approved", "pending"]).lte("starts_on", addDays(gridStart, dayCount - 1)).gte("ends_on", gridStart).order("starts_on")
+  const absentOn = (emp: string, day: string) => (absences ?? []).some((a) => a.status === "approved" && a.employee_id === emp && a.starts_on <= day && a.ends_on >= day)
+  const conflicts = shifts.filter((s) => s.scheduled_start && s.status !== "cancelled" && s.employeeIds.some((e) => absentOn(e, dayKey(s.scheduled_start!))))
+  const pendingAbs = (absences ?? []).filter((a) => a.status === "pending").length
 
   const byDay: Record<string, CalendarShift[]> = {}
   for (const s of shifts) {
@@ -106,6 +110,14 @@ export default async function ShiftPlanPage({ searchParams }: { searchParams: Pr
         {sp.fejl && <p className="admin-notice is-error" role="alert">{sp.fejl}</p>}
         {error && <p className="admin-notice is-error" role="alert">{error}</p>}
         {!staff.length && <p className="admin-notice">Der er ingen medarbejdere endnu. <Link href="/admin/brugere">Invitér medarbejdere</Link>.</p>}
+        {(absences?.length ?? 0) > 0 && (
+          <p className="admin-notice">
+            <strong>Fravær i perioden:</strong>{" "}
+            {(absences ?? []).filter((a) => a.status === "approved").map((a, i) => <span key={i}>{i ? " · " : ""}{(names.get(a.employee_id) ?? "?").split(" ")[0]} {new Date(`${a.starts_on}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}{a.ends_on !== a.starts_on ? `–${new Date(`${a.ends_on}T12:00:00Z`).toLocaleDateString("da-DK", { day: "numeric", month: "short" })}` : ""}</span>)}
+            {pendingAbs > 0 && <> · <Link href="/admin/fravaer">{pendingAbs} ansøgning{pendingAbs === 1 ? "" : "er"} venter</Link></>}
+          </p>
+        )}
+        {conflicts.length > 0 && <p className="admin-notice is-error" role="alert">{conflicts.length} vagt{conflicts.length === 1 ? "" : "er"} har en medarbejder med godkendt fravær: {conflicts.slice(0, 4).map((s, i) => <span key={s.id}>{i ? ", " : ""}<Link href={`${base}&vagt=${s.id}`}>{shiftName(s)} {new Date(s.scheduled_start!).toLocaleDateString("da-DK", { timeZone: "Europe/Copenhagen", day: "numeric", month: "short" })}</Link></span>)}{conflicts.length > 4 ? " …" : ""}</p>}
         {!locations.length && <p className="admin-notice">Tip: <Link href="/admin/steder">Opret jeres steder</Link>, så medarbejderne kan tjekke ind med GPS.</p>}
 
         {selected && (
