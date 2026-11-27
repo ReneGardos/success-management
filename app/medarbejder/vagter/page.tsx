@@ -6,6 +6,7 @@ import { addDays, copenhagenToIso, dayKey, formatDay, mondayOf, todayLocal, week
 import { ClaimButton } from "@/components/employee-shift-actions"
 import ShiftCard from "@/components/shift-card"
 import CalendarSubscribe from "@/components/calendar-subscribe"
+import { TakeOver } from "@/components/handover-actions"
 import { calendarFeed } from "@/lib/backend/calendar"
 
 export const dynamic = "force-dynamic"
@@ -19,13 +20,19 @@ export default async function EmployeeShifts({ searchParams }: { searchParams: P
   const from = copenhagenToIso(today, "00:00")!
   const to = copenhagenToIso(addDays(today, 60), "00:00")!
   const db = createAdminClient()
-  const [{ data: assignments }, { data: absences }] = await Promise.all([
+  const [{ data: assignments }, { data: absences }, { data: handovers }] = await Promise.all([
     db.from("job_assignments").select("job_id").eq("org_id", org.id).eq("employee_id", userId),
     db.from("employee_absences").select("starts_on, ends_on, status").eq("org_id", org.id).eq("employee_id", userId).neq("status", "declined").gte("ends_on", today),
+    db.from("shift_handovers").select("id, job_id, employee_id").eq("org_id", org.id).eq("status", "open"),
   ])
+  const offeredByOthers = new Map((handovers ?? []).filter((h) => h.employee_id !== userId).map((h) => [String(h.job_id), String(h.id)]))
+  const offeredByMe = new Set((handovers ?? []).filter((h) => h.employee_id === userId).map((h) => String(h.job_id)))
   const myIds = (assignments ?? []).map((a) => String(a.job_id))
   const list = vis === "ledige"
-    ? (await loadShifts(org.id, new Date().toISOString(), to, { onlyOpen: true })).shifts.filter((s) => !s.employeeIds.includes(userId) && s.employeeIds.length < s.max_staff)
+    ? [
+        ...(offeredByOthers.size ? (await loadShifts(org.id, new Date().toISOString(), to, { onlyIds: [...offeredByOthers.keys()] })).shifts.filter((s) => !s.employeeIds.includes(userId)) : []),
+        ...(await loadShifts(org.id, new Date().toISOString(), to, { onlyOpen: true })).shifts.filter((s) => !s.employeeIds.includes(userId) && s.employeeIds.length < s.max_staff && !offeredByOthers.has(s.id)),
+      ].sort((a, b) => (a.scheduled_start ?? "").localeCompare(b.scheduled_start ?? ""))
     : (await loadShifts(org.id, from, to, { onlyIds: myIds })).shifts.filter((s) => s.status !== "cancelled")
   const weeks = new Map<string, Shift[]>()
   for (const s of list) if (s.scheduled_start) { const w = mondayOf(dayKey(s.scheduled_start)); weeks.set(w, [...(weeks.get(w) ?? []), s]) }
@@ -48,8 +55,10 @@ export default async function EmployeeShifts({ searchParams }: { searchParams: P
             {shifts.map((s) => (
               <div key={s.id} className="pt-dayblock">
                 <p className="pt-day">{formatDay(s.scheduled_start!)}{off(dayKey(s.scheduled_start!)) ? <span className="pt-pill s-cancelled">Fravær</span> : null}</p>
-                <ShiftCard shift={s}>
-                  {vis === "ledige" && !preview && <div className="pt-actions"><ClaimButton jobId={s.id} /><span className="pt-muted">{s.max_staff - s.employeeIds.length} ledig{s.max_staff - s.employeeIds.length === 1 ? "" : "e"} plads{s.max_staff - s.employeeIds.length === 1 ? "" : "er"}</span></div>}
+                <ShiftCard shift={s} href={`/medarbejder/vagt/${s.id}`}>
+                  {offeredByMe.has(s.id) && vis !== "ledige" && <span className="pt-pill a-pending">Sat til overtagelse</span>}
+                  {vis === "ledige" && offeredByOthers.has(s.id) && !preview && <div className="pt-actions"><span className="pt-pill a-pending">Kollega søger afløser</span><TakeOver handoverId={offeredByOthers.get(s.id)!} /></div>}
+                  {vis === "ledige" && !offeredByOthers.has(s.id) && !preview && <div className="pt-actions"><ClaimButton jobId={s.id} /><span className="pt-muted">{s.max_staff - s.employeeIds.length} ledig{s.max_staff - s.employeeIds.length === 1 ? "" : "e"} plads{s.max_staff - s.employeeIds.length === 1 ? "" : "er"}</span></div>}
                 </ShiftCard>
               </div>
             ))}

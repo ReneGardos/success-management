@@ -1,4 +1,5 @@
-import { Clock, KeyRound, MapPin, Phone } from "lucide-react"
+import Link from "next/link"
+import { ChevronRight, Clock, KeyRound, MapPin, Phone } from "lucide-react"
 import { mapsLink } from "@/lib/geo"
 import { shiftAddress, shiftName, type Shift } from "@/lib/backend/shifts"
 import { formatTime } from "@/lib/time"
@@ -6,12 +7,12 @@ import { formatTime } from "@/lib/time"
 const statusLabels: Record<string, string> = { scheduled: "Planlagt", in_progress: "I gang", completed: "Udført", cancelled: "Aflyst" }
 
 /** Shift details for the employee: time, address (maps), access, contact and instructions. */
-export default function ShiftCard({ shift, children, highlight }: { shift: Shift; children?: React.ReactNode; highlight?: boolean }) {
+export default function ShiftCard({ shift, children, highlight, href }: { shift: Shift; children?: React.ReactNode; highlight?: boolean; href?: string }) {
   const address = shiftAddress(shift)
   return (
     <article className={`pt-shift${highlight ? " is-now" : ""}${shift.status === "completed" ? " is-done" : ""}`}>
       <header>
-        <div><h3>{shiftName(shift)}</h3>{shift.location?.name && shift.title && <p>{shift.location.name}</p>}</div>
+        <div><h3>{href ? <Link href={href} className="pt-shift-link">{shiftName(shift)} <ChevronRight className="size-4 inline" /></Link> : shiftName(shift)}</h3>{shift.location?.name && shift.title && <p>{shift.location.name}</p>}</div>
         <span className={`pt-pill s-${shift.status}`}>{statusLabels[shift.status] ?? shift.status}</span>
       </header>
       {shift.scheduled_start && <p className="pt-row"><Clock className="size-4" /> {formatTime(shift.scheduled_start)}{shift.scheduled_end ? `–${formatTime(shift.scheduled_end)}` : ""}</p>}
