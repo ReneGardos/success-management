@@ -3,9 +3,9 @@
 import { useEffect, useState } from "react"
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { CalendarDays, CalendarOff, ClipboardList, Clock, FileText, Home, Map as MapIcon, MessageCircle, MessageSquareWarning, MoreHorizontal, PackageOpen, Receipt, ShoppingBag, User, X } from "lucide-react"
+import { FileText as DocIcon, GraduationCap, CalendarDays, CalendarOff, ClipboardList, Clock, FileText, Home, Map as MapIcon, MessageCircle, MessageSquareWarning, MoreHorizontal, PackageOpen, Receipt, ShoppingBag, User, X } from "lucide-react"
 
-const icons = { home: Home, calendar: CalendarDays, clock: Clock, off: CalendarOff, box: PackageOpen, user: User, report: ClipboardList, quote: FileText, invoice: Receipt, order: ShoppingBag, feedback: MessageSquareWarning, chat: MessageCircle, map: MapIcon }
+const icons = { home: Home, calendar: CalendarDays, clock: Clock, off: CalendarOff, box: PackageOpen, user: User, report: ClipboardList, quote: FileText, invoice: Receipt, order: ShoppingBag, feedback: MessageSquareWarning, chat: MessageCircle, map: MapIcon, course: GraduationCap, doc: DocIcon }
 export type NavItem = { href: string; label: string; icon: keyof typeof icons; badge?: number }
 
 /** Tabs at the top on tablet/desktop; on phones a bottom bar with the first four + "Mere". */

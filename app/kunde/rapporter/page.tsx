@@ -1,6 +1,7 @@
 import { Check, MapPin, Star } from "lucide-react"
 import { createAdminClient } from "@/lib/supabase/admin"
 import { customerPortal } from "@/lib/portal"
+import { scoreClass } from "@/lib/quality"
 
 export const dynamic = "force-dynamic"
 export const metadata = { title: "Rapporter" }
@@ -25,6 +26,7 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
   const pics = new Map<string, number>()
   for (const ph of photos ?? []) if (ph.report_id) pics.set(ph.report_id, (pics.get(ph.report_id) ?? 0) + 1)
   const locName = new Map(p.locations.map((l) => [l.id, l.name]))
+  const { data: inspections } = p.locIds.length ? await db.from("quality_inspections").select("id, score, completed_at, note, location_id").eq("org_id", p.org.id).in("location_id", p.locIds).eq("status", "done").eq("share_with_customer", true).order("completed_at", { ascending: false }).limit(10) : { data: [] }
   const all = [...score.values()].reduce((a, [d, t]) => [a[0] + d, a[1] + t], [0, 0])
   const rated = (reports ?? []).filter((r) => r.customer_rating)
   const avg = rated.length ? rated.reduce((s, r) => s + Number(r.customer_rating), 0) / rated.length : 0
@@ -45,6 +47,12 @@ export default async function CustomerReports({ searchParams }: { searchParams: 
         <div><small>Jeres bedømmelse</small><strong>{avg ? `${avg.toFixed(1).replace(".", ",")} ★` : "–"}</strong><em>{rated.length} bedømt</em></div>
         <div><small>Mangler bedømmelse</small><strong>{unrated}</strong><em>tryk på et besøg</em></div>
       </div>
+      {(inspections ?? []).length > 0 && (
+        <section className="pt-card">
+          <h2>Kvalitetskontroller</h2>
+          <ul className="pt-mini">{(inspections ?? []).map((i) => <li key={i.id}><span><strong>{locName.get(String(i.location_id)) ?? "Sted"}</strong><small>{i.completed_at ? new Date(i.completed_at).toLocaleDateString("da-DK") : ""}{i.note ? ` · ${i.note.slice(0, 100)}` : ""}</small></span><b><span className={`q-pill ${scoreClass(Number(i.score))}`}>{Number(i.score).toFixed(0)} %</span></b></li>)}</ul>
+        </section>
+      )}
       <section className="pt-card">
         <ul className="pt-mini">
           {(reports ?? []).map((r) => {

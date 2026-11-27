@@ -29,6 +29,7 @@ export default async function CustomerLayout({ children }: { children: React.Rea
         { href: "/kunde/tilbud", label: "Tilbud", icon: "quote" },
         { href: "/kunde/bestil", label: "Bestil", icon: "order" },
         { href: "/kunde/feedback", label: "Feedback", icon: "feedback" },
+        { href: "/kunde/dokumenter", label: "Dokumenter", icon: "doc" },
         { href: "/kunde/profil", label: "Profil", icon: "user" },
       ]}
     >

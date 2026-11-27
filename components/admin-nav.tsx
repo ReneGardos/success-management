@@ -4,7 +4,7 @@ import Link from "next/link"
 import { useEffect, useState } from "react"
 import { usePathname } from "next/navigation"
 import NotificationBell from "@/components/notification-bell"
-import { PiggyBank, Wallet, Zap, CalendarClock, MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
+import { Award, FolderLock, GraduationCap, PiggyBank, Wallet, Zap, CalendarClock, MessagesSquare, BarChart3, Building2, Eye, CalendarDays, CalendarOff, ClipboardCheck, Clock, Contact, ListChecks, MessageCircleWarning, PackageOpen, ExternalLink, FileSignature, Globe, Kanban, LayoutDashboard, LogOut, Mail, MapPin, Menu, Receipt, Search, Settings, ShieldCheck, Users, X } from "lucide-react"
 
 const groups = [
   { title: "Drift", links: [
@@ -16,6 +16,7 @@ const groups = [
     { href: "/admin/besoeg", label: "Kundeønsker", icon: CalendarClock },
     { href: "/admin/steder", label: "Steder", icon: MapPin },
     { href: "/admin/rapporter", label: "Rapporter", icon: ClipboardCheck },
+    { href: "/admin/kvalitet", label: "Kvalitet", icon: Award },
     { href: "/admin/forsyning", label: "Forsyning", icon: PackageOpen },
   ] },
   { title: "Kunder og salg", links: [
@@ -32,6 +33,8 @@ const groups = [
     { href: "/admin/oekonomi", label: "Økonomi", icon: PiggyBank },
     { href: "/admin/statistik", label: "Statistik", icon: BarChart3 },
     { href: "/admin/brugere", label: "Medarbejdere", icon: Users },
+    { href: "/admin/dokumenter", label: "Dokumenter", icon: FolderLock },
+    { href: "/admin/kurser", label: "Kurser", icon: GraduationCap },
     { href: "/admin/se-som", label: "Se som medarbejder/kunde", icon: Eye },
     { href: "/admin/automatisering", label: "Automatisering", icon: Zap },
     { href: "/admin/hjemmesider", label: "Hjemmesider og API", icon: Globe },
