@@ -26,6 +26,8 @@ export default async function EmployeeLayout({ children }: { children: React.Rea
         { href: "/medarbejder/timer", label: "Timer", icon: "clock" },
         { href: "/medarbejder/fravaer", label: "Fravær", icon: "off" },
         { href: "/medarbejder/mangler", label: "Mangler", icon: "box" },
+        { href: "/medarbejder/kurser", label: "Kurser", icon: "course" },
+        { href: "/medarbejder/dokumenter", label: "Dokumenter", icon: "doc" },
         { href: "/medarbejder/profil", label: "Profil", icon: "user" },
       ]}
     >
